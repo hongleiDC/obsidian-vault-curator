@@ -1,97 +1,102 @@
-# Obsidian Vault Curator 示例
+# Obsidian Vault Curator examples
 
-这些示例用于校准输出风格，不要求逐字套用。
+All examples in this file are fictional and intentionally unrelated to any user's real Vault, identity, organization, project, or research topic.
 
-## 示例 1：单篇结构整理
+## Example 1: restructure one note
 
-### 输入
+### Input
 
 ```markdown
-ros noetic中tf是坐标变换，tf2更常用，我这里老是出现map到base_link断掉的问题，有时候是时间戳不对。
+数据库索引可以加快查询，但是写入会变慢。我总是忘记什么时候该建索引。
 
-![[tf-tree.png]]
+![[index-overview.png]]
 
-我需要检查 /tf 和 /tf_static，还要看use_sim_time。rosbag回放的时候clock也很重要。
+常用查询字段可以考虑索引，但是不能什么字段都建。还要看选择性和写入频率。
 ```
 
-### 输出
+### Output
 
 ```markdown
 ---
 tags:
-  - ros/noetic
-  - tf
+  - database/indexing
 aliases:
-  - TF 排查
+  - 数据库索引笔记
 ---
 
-# ROS Noetic 中的 TF 排查
+# 数据库索引
 
-TF 用于维护坐标系之间的变换关系。当前问题表现为 `map` 到 `base_link` 的变换链偶尔中断，可能与时间戳有关。
+数据库索引可以加快查询，但通常会增加写入和维护成本。
 
-![[tf-tree.png]]
+![[index-overview.png]]
 
-## 重点检查项
+## 何时考虑建立索引
 
-- 检查 `/tf` 与 `/tf_static` 是否持续发布预期变换。
-- 检查 `use_sim_time` 配置是否与当前运行模式一致。
-- 回放 rosbag 时关注 `/clock`，确认各节点使用同一时间基准。
+- 字段经常出现在查询条件中。
+- 结合字段选择性判断索引价值。
+- 同时考虑写入频率，避免对高频写入表过度建立索引。
 ```
 
-说明：只重排已有信息，没有凭空加入具体命令、数值或故障结论。
+The output only restructures information already present in the input.
 
-## 示例 2：概念补丁
+## Example 2: concept patch
 
-### 输入片段
+### Input fragment
 
 ```markdown
-- rosbag 回放时要注意 `use_sim_time`。
+- 缓存策略需要考虑 TTL。
 ```
 
-用户问：“use_sim_time 是什么？”
+The user asks what TTL means.
 
-### 输出片段
+### Output fragment
 
 ```markdown
-- rosbag 回放时要注意 `use_sim_time`。
-  > [!question]- 补丁：`use_sim_time` 是什么？
-  > `use_sim_time` 用来让 ROS 节点使用仿真时间而不是系统墙钟时间。启用后，节点通常从 `/clock` 获取当前时间，因此 rosbag 回放或仿真环境中的时间源是否正常会直接影响基于时间戳的处理。
+- 缓存策略需要考虑 TTL。
+  > [!question]- 补丁：TTL 是什么？
+  > TTL（Time To Live）表示缓存条目在失效前可保留的时间。到期后，系统通常需要重新获取或重新计算数据。
 ```
 
-## 示例 3：不要制造假双链
+## Example 3: do not invent wikilinks
 
-如果 Vault 中只确认存在：
+Assume the Vault index confirms only these notes exist:
 
-- `ROS Noetic.md`
-- `TF Debugging.md`
+- `Caching Basics.md`
+- `Database Indexes.md`
 
-正文出现“时间同步”时，不要自动写成 `[[时间同步]]`，除非该笔记真实存在。可以在真正相关的位置写：
+If the text mentions “cache invalidation”, do not automatically create `[[Cache Invalidation]]` unless that target really exists.
+
+A verified link may instead be embedded naturally:
 
 ```markdown
-这一问题也会影响 [[TF Debugging|TF 排查]]。
+这个问题与 [[Caching Basics|缓存基础]] 中的失效策略有关。
 ```
 
-## 示例 4：保留插件字段
+## Example 4: preserve plugin fields
 
-### 输入
+### Input
 
 ```markdown
 ---
 status: active
-tags: [gnss]
-custom_plugin_field: abc
+tags: [reading]
+custom_plugin_field: keep-me
 ---
 
-baseline:: 1.2 m
+progress:: 40%
 
-- [ ] 检查 heading offset
+- [ ] 阅读下一章
 ```
 
-整理后必须继续保留：
+After curation, preserve:
 
-- `status: active`
-- `custom_plugin_field: abc`
-- `baseline:: 1.2 m`
-- `- [ ]` 任务状态
+- `status: active`;
+- `custom_plugin_field: keep-me`;
+- `progress:: 40%`;
+- the unchecked task state.
 
-可以扩充 `tags`，但不得通过模板覆盖掉未知字段。
+Metadata may be normalized, but unknown fields must not be removed by a template.
+
+## Example 5: private binding is never a repository fixture
+
+The Skill may remember a user's GitHub Vault through the external private state directory. Public examples must never include a real repository identifier, real note path, real attachment name, or copied private note content.
