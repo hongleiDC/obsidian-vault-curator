@@ -32,7 +32,10 @@ If the environment has no persistent writable filesystem, do not fall back to em
 ├── runtime/
 │   └── last-success.json
 ├── cache/
-│   └── vault-index.json
+│   ├── vault-index.json
+│   └── vault-patterns.json
+├── methods/
+│   └── note-system.json
 └── locks/
     └── github-write.lock
 ```
@@ -64,6 +67,12 @@ Do not store note content.
 
 Derived cache only. It may contain note names, paths, headings, block IDs, and link targets, so treat it as private. It must be safe to delete and rebuild.
 
+### methods/note-system.json
+
+Store the accepted note methodology and structural preferences here. It may include note-type contracts, folder/tag/link roles, curation rules and a small aggregate analysis summary.
+
+Do not store raw note bodies, copied excerpts, repository identifiers, credentials or unnecessary personal profile information in this file.
+
 ### locks/github-write.lock
 
 Use a lock during a GitHub write transaction when the execution environment supports it. This reduces overlapping runs that try to modify the same Vault simultaneously.
@@ -81,6 +90,9 @@ python scripts/state_store.py init --repository <value>
 python scripts/state_store.py read
 python scripts/state_store.py set --branch <value>
 python scripts/state_store.py status
+python scripts/state_store.py method-status
+python scripts/state_store.py method-read
+python scripts/state_store.py method-write --file <methodology.json>
 python scripts/state_store.py lock-acquire
 python scripts/state_store.py lock-release
 ```
@@ -115,3 +127,7 @@ When the user switches Vault repositories or branches:
 - Redact repository identifiers in user-visible diagnostics unless the user explicitly asks to see them.
 - Never log credentials.
 - Prefer error categories such as `repository unavailable`, `branch unavailable`, or `write conflict` over dumping connector payloads containing private metadata.
+
+## Methodology persistence
+
+After a Vault diagnosis and small pilot, persist the accepted method with `method-write`. Future curation tasks should load it with `method-read` instead of re-designing the note system every time. Re-analyze only when the user asks, the method is missing, or the Vault structure has materially drifted.
