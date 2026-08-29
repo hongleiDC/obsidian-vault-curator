@@ -25,6 +25,7 @@ The public project never needs a real Vault repository identifier, real note pat
 
 ## Features
 
+- Adaptive Vault diagnosis and note-method design based on existing data patterns.
 - Single-note and multi-note curation.
 - Frontmatter / Properties merge instead of destructive replacement.
 - Conservative wikilink validation.
@@ -34,6 +35,8 @@ The public project never needs a real Vault repository identifier, real note pat
 - Atomic multi-file commit strategy when Git Data operations are available.
 - Semantic-preservation verification scripts.
 - Vault indexing for safer cross-note linking.
+- Aggregate structural analysis for note lengths, metadata, links, tasks, logs, sources, and recurring note shapes.
+- Private persistence of the accepted note methodology so later sessions reuse the same logic.
 
 ## Private persistent state
 
@@ -51,6 +54,8 @@ Typical local layout:
 ├── profiles/default.json
 ├── runtime/last-success.json
 ├── cache/vault-index.json
+├── cache/vault-patterns.json
+├── methods/note-system.json
 └── locks/github-write.lock
 ```
 
@@ -71,6 +76,41 @@ python scripts/state_store.py status
 The helper uses atomic writes and attempts private filesystem permissions where supported. Authentication tokens are never stored; GitHub authentication remains with the connector.
 
 > Persistence depends on the execution environment providing a persistent writable directory. If it does not, the Skill must not fall back to embedding private binding data in the Skill ZIP or public repository.
+
+## Adaptive note methodology
+
+The Skill does not assume that every Vault should use one universal template or a fashionable system. It first studies the current structure, then recommends the smallest useful combination of note types.
+
+Typical functional types include:
+
+```text
+Capture   → fast temporary input
+Source    → what external material says
+Log       → what happened over time
+Project   → active outcomes, state and actions
+Concept   → reusable understanding
+Decision  → why an important choice was made
+How-to    → reproducible procedures and troubleshooting
+Reference → fast lookup
+MOC       → curated navigation across mature clusters
+```
+
+For a locally materialized Vault, structural evidence can be collected without copying note bodies:
+
+```bash
+python scripts/analyze_vault_patterns.py /path/to/vault --output /tmp/vault-patterns.json
+```
+
+The default report contains aggregate metrics only. It does not emit note titles, note paths or text excerpts.
+
+After a small pilot, the accepted method can be stored privately outside the Skill repository:
+
+```bash
+python scripts/state_store.py method-write --file /tmp/note-system.json
+python scripts/state_store.py method-status
+```
+
+Future curation loads this private methodology instead of redesigning the note system on every conversation.
 
 ## GitHub write strategy
 
@@ -113,6 +153,7 @@ obsidian-vault-curator/
 ├── agents/
 │   └── openai.yaml
 ├── scripts/
+│   ├── analyze_vault_patterns.py
 │   ├── build_vault_index.py
 │   ├── state_store.py
 │   └── verify_note_preservation.py
@@ -120,6 +161,7 @@ obsidian-vault-curator/
     ├── examples.md
     ├── formatting-rules.md
     ├── github-backend.md
+    ├── note-methodology.md
     ├── private-state.md
     └── vault-linking.md
 ```
@@ -130,6 +172,10 @@ There is deliberately no user `config/` directory in the project.
 
 ```text
 Curate the note I named from my bound Vault. Preserve all existing semantics and use the safe GitHub write policy.
+```
+
+```text
+Analyze my current Vault structure first and recommend a note logic and note-taking method that fits the data I already have. Do not rewrite the Vault yet.
 ```
 
 ```text
@@ -167,7 +213,9 @@ A non-zero exit code indicates protected constructs may have disappeared or chan
 5. Prefer a temporary branch and one logical commit over repeated file-by-file pushes.
 6. Retry conflicts at most once after refreshing state.
 7. Do not force risky operations through automation.
-8. Keep Markdown restrained and readable.
+8. Choose note methods from observed workflows, not from fashion or a universal template.
+9. Pilot a methodology on a small sample before large migration.
+10. Keep Markdown restrained and readable.
 
 ## Inspiration
 
