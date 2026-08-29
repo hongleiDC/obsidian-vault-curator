@@ -100,3 +100,24 @@ Metadata may be normalized, but unknown fields must not be removed by a template
 ## Example 5: private binding is never a repository fixture
 
 The Skill may remember a user's GitHub Vault through the external private state directory. Public examples must never include a real repository identifier, real note path, real attachment name, or copied private note content.
+
+## Example 6: diagnose before choosing a note method
+
+Assume an aggregate Vault analysis finds:
+
+- many date-named notes with tasks;
+- a smaller set of short heavily linked concept notes;
+- several source-heavy notes with URLs;
+- a few high-link-density navigation notes.
+
+Do not force every note into one template. Recommend a hybrid logic such as:
+
+```text
+Daily / Log → preserve chronology and extract durable conclusions
+Project     → goal, status, next actions, decisions
+Source      → what the source says
+Concept     → reusable understanding in the user's own words
+MOC         → curated navigation across mature clusters
+```
+
+Pilot the method on a small representative set before changing the rest of the Vault. If the user accepts it, persist only the methodology in the external private state directory.
