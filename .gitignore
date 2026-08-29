@@ -8,3 +8,7 @@ venv/
 Thumbs.db
 *.log
 .vault-index.json
+
+# User-specific vault profile. Keep private repository addresses out of the public skill repo.
+config/vault.yaml
+config/*.local.yaml
