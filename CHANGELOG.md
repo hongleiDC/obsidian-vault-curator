@@ -12,6 +12,21 @@ All notable changes to this project are documented here.
 - Backlink-aware rename and move workflows.
 - Incremental indexing for larger vaults.
 
+## [0.3.0] - 2026-08-29
+
+### Added
+- Adaptive Vault diagnosis before choosing a note-taking method.
+- `scripts/analyze_vault_patterns.py` for privacy-preserving aggregate structural analysis.
+- `references/note-methodology.md` with functional note types, method-selection rules, hybrid architecture, pilot workflow, and migration boundaries.
+- Private methodology persistence at `methods/note-system.json` through new `state_store.py` method commands.
+- Explicit note archetypes for capture, concept, source/reference, project, log/experiment, decision, technical how-to, MOC/hub, and structured reference notes.
+
+### Changed
+- The Skill now treats note-system design as a core capability rather than a formatting side effect.
+- Future curation loads an accepted private methodology instead of re-designing the Vault on every task.
+- Large migrations require a representative pilot before broad application.
+- PARA, Zettelkasten, MOC, folder, tag, and link strategies are selected only when supported by the existing Vault workflow.
+
 ## [0.2.0] - 2026-08-29
 
 ### Changed

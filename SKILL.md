@@ -1,6 +1,6 @@
 ---
 name: obsidian-vault-curator
-description: 整理、重构、美化和维护 Obsidian Markdown 笔记与 Vault，尤其适用于笔记长期保存在 GitHub 仓库中的知识库。用于从仓库外的私有持久化状态目录自动恢复 Vault 绑定、通过 GitHub connector 读取和安全写回单篇或多篇 .md、结构重排、Frontmatter/Properties 合并、tags/aliases 管理、wikilinks/嵌入/callout/任务/引用规范化、概念解释补丁、批量知识关联与冲突可控的提交。必须保护事实、代码、公式、附件、任务、引用、块 ID、Dataview 字段和已有链接；绝不把用户仓库地址、私有路径、令牌或个人笔记内容写入 Skill 源码仓库或 Skill 包。
+description: 分析、设计、整理和维护 Obsidian Markdown 笔记与 Vault，尤其适用于笔记长期保存在 GitHub 仓库中的知识库。用于先分析现有 Vault 的数据形态、目录、Frontmatter、标签、链接、任务、日志、来源与笔记长度等结构特征，再为用户选择合适的混合笔记逻辑与方法，并从仓库外的私有持久化状态目录恢复 Vault 绑定和已采用的笔记方法；支持 GitHub connector 安全读写、单篇/多篇重构、Properties 合并、wikilinks、概念补丁、批量知识关联与冲突可控提交。必须保护原始语义与隐私，绝不把用户仓库地址、私有路径、令牌或个人笔记内容写入 Skill 源码仓库或 Skill 包。
 ---
 
 # Obsidian Vault Curator
@@ -12,18 +12,20 @@ description: 整理、重构、美化和维护 Obsidian Markdown 笔记与 Vault
 按需读取：
 - `references/private-state.md`：私有持久化状态目录、绑定、权限、迁移与隐私规则。
 - `references/github-backend.md`：GitHub 读取、分支、原子提交、PR、冲突和重试策略。
+- `references/note-methodology.md`：Vault 诊断、笔记类型识别、混合笔记方法、试点与长期方法规则。
 - `references/formatting-rules.md`：排版、Properties、任务、代码、公式和 callout 规则。
 - `references/vault-linking.md`：Vault 索引、真实双链、批量整理和文件迁移规则。
 - `references/examples.md`：完全虚构的通用示例。
 
 ## 工作模式
 
-1. **GitHub 单篇整理**：从已绑定 Vault 读取一篇笔记，整理后按安全策略写回。
-2. **GitHub 批量整理**：处理多篇笔记、跨笔记链接或元数据一致性，通过临时分支与 PR 写回。
-3. **单篇文件整理**：整理用户直接提供的 Markdown 或本地 `.md` 文件。
-4. **概念补丁**：只解释用户点名的术语，不重排整篇。
-5. **Vault / 多篇整理**：扫描多篇笔记，验证真实链接后建立关联。
-6. **审计模式**：只指出结构、链接、标签、元数据或语法问题，不写回。
+1. **Vault 诊断与方法设计**：分析现有数据形态，识别反复出现的笔记类型与工作流，推荐适合的笔记逻辑和方法。
+2. **GitHub 单篇整理**：从已绑定 Vault 读取一篇笔记，按已采用的方法整理后安全写回。
+3. **GitHub 批量整理**：处理多篇笔记、跨笔记链接或元数据一致性，通过临时分支与 PR 写回。
+4. **单篇文件整理**：整理用户直接提供的 Markdown 或本地 `.md` 文件。
+5. **概念补丁**：只解释用户点名的术语，不重排整篇。
+6. **Vault / 多篇整理**：扫描多篇笔记，验证真实链接后建立关联。
+7. **审计模式**：只指出结构、链接、标签、元数据、方法或语法问题，不写回。
 
 ## 私有状态必须与 Skill 仓库隔离
 
@@ -50,12 +52,15 @@ description: 整理、重构、美化和维护 Obsidian Markdown 笔记与 Vault
 ├── runtime/
 │   └── last-success.json
 ├── cache/
-│   └── vault-index.json
+│   ├── vault-index.json
+│   └── vault-patterns.json
+├── methods/
+│   └── note-system.json
 └── locks/
     └── github-write.lock
 ```
 
-首次绑定或修改绑定时，优先运行 `scripts/state_store.py`。详细规则见 `references/private-state.md`。
+首次绑定、修改绑定或保存笔记方法时，优先运行 `scripts/state_store.py`。`methods/note-system.json` 只保存方法与结构偏好，不保存原始笔记正文。详细规则见 `references/private-state.md`。
 
 如果当前运行环境没有可持久写入的私有文件系统，不要假装已经持久化，也不要退回到把配置塞进 Skill 包或公开仓库。应明确说明限制，并仅在当前会话使用用户提供的绑定，或使用用户指定的私有持久存储位置。
 
@@ -64,11 +69,12 @@ description: 整理、重构、美化和维护 Obsidian Markdown 笔记与 Vault
 每次任务都重新从私有状态目录加载绑定，不依赖聊天记忆：
 
 1. 加载 `profiles/default.json`。
-2. 取得 Vault repository、base branch 与可选 Vault root。
-3. 用 GitHub connector 确认仓库和分支仍可访问。
-4. 限定所有读写路径在配置的 Vault root 内，除非用户明确要求扩大范围。
-5. 从远端读取当前文件；不要复用上一轮对话缓存的正文或 SHA。
-6. 先形成完整修改方案并执行保护检查，再选择写回策略。
+2. 若存在 `methods/note-system.json`，同时加载已采用的笔记方法；普通整理时不要每次重新设计方法。
+3. 取得 Vault repository、base branch 与可选 Vault root。
+4. 用 GitHub connector 确认仓库和分支仍可访问。
+5. 限定所有读写路径在配置的 Vault root 内，除非用户明确要求扩大范围。
+6. 从远端读取当前文件；不要复用上一轮对话缓存的正文或 SHA。
+7. 先形成完整修改方案并执行保护检查，再选择写回策略。
 
 配置不存在时进入一次性绑定模式：只询问真正缺失的信息，并把结果写到私有状态目录；以后不再重复询问。
 
@@ -122,6 +128,41 @@ python scripts/verify_note_preservation.py ORIGINAL CURATED
 ```
 
 发现保护项丢失时先修复，再写回。
+
+## Vault 诊断与笔记方法设计
+
+当用户要求“分析我现在的笔记怎么整理”“帮我设计笔记逻辑/笔记方法”“这个 Vault 应该怎么组织”时，不要先套模板。按以下流程：
+
+1. **只读诊断**：先观察当前 Vault，不立即改文件。
+2. **结构统计**：分析笔记数量和长度、目录深度、日期命名、Frontmatter keys、tags、wikilinks、tasks、source/url、代码、表格、callout、Dataview 等。
+3. **识别反复出现的功能类型**：例如 capture、concept、source/reference、project、log/experiment、decision、technical-howto、MOC/hub、structured-reference。
+4. **识别真正的摩擦点**：区分“格式不统一”和“知识逻辑混乱”，例如来源与个人结论混在一起、项目日志被当成永久知识、daily 中的结论从未沉淀、标签/文件夹/链接重复承担同一分类职责。
+5. **推荐最小可用方法**：优先混合 note-type 架构，不因为流行而强推 PARA、Zettelkasten 或统一模板。
+6. **小批量试点**：先挑 5–15 篇代表性笔记试整理，验证检索、阅读、维护和链接是否变好。
+7. **持久化已接受的方法**：用户接受后，把方法写入外部私有状态 `methods/note-system.json`；不要写入 Skill 仓库或 Vault 正文。
+8. **后续自动沿用**：未来整理时先读取该方法，根据笔记功能类型选择相应结构；只有用户要求重设计或 Vault 明显漂移时才重新诊断。
+
+本地/materialized Vault 可运行：
+
+```bash
+python scripts/analyze_vault_patterns.py <vault-root> --output <private-report.json>
+```
+
+默认报告只含聚合结构指标，不输出笔记正文、标题或路径。完整方法见 `references/note-methodology.md`。
+
+### 方法设计原则
+
+- 不要求整个 Vault 只有一种笔记模板。
+- **Capture** 服务快速记录；不要过度格式化。
+- **Source** 保存外部来源；与用户自己的 synthesis/claim 分开。
+- **Log / Daily / Experiment** 保留时间线；不要反复重写成 evergreen 文体。
+- **Project** 围绕当前目标、状态、行动和决策。
+- **Concept / Evergreen** 保存可复用理解；只有具备独立复用价值时才拆成原子笔记。
+- **Decision record** 保存为什么做出选择。
+- **How-to / Troubleshooting** 强调症状/目标、证据、步骤、验证和失败模式。
+- **Reference** 强调快速查找；表格/列表往往优于长段落。
+- **MOC / Hub** 用于真实需要导航的知识簇，不是 backlink 列表。
+- 文件夹、Properties、tags、wikilinks、MOC 应分工，不要重复编码同一分类体系。
 
 ## 单篇整理流程
 
@@ -205,5 +246,6 @@ python scripts/verify_note_preservation.py ORIGINAL CURATED
 - 代码、公式、附件、任务、Dataview、footnotes 和 block ID 未损坏；
 - 新增 wikilink 都有真实目标；
 - GitHub 写回遵守 branch-first、有限重试和无强推规则；
+- 若私有笔记方法存在，整理结果与其 note-type 规则一致；若不存在且任务涉及体系设计，先诊断再推荐；
 - 无变化时没有生成提交；
 - 高风险操作没有被自动合并。
