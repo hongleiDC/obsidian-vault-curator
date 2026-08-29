@@ -1,0 +1,3 @@
+interface:
+  display_name: "Obsidian Vault Curator"
+  short_description: "整理、重构并安全维护 Obsidian 笔记与知识关联"
