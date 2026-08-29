@@ -18,6 +18,7 @@ from pathlib import Path
 APP_DIR = ".obsidian-vault-curator"
 PROFILE_REL = Path("profiles/default.json")
 LOCK_REL = Path("locks/github-write.lock")
+METHOD_REL = Path("methods/note-system.json")
 
 DEFAULT_PROFILE = {
     "schema_version": 1,
@@ -66,7 +67,7 @@ def ensure_root(root: Path) -> None:
         root.chmod(0o700)
     except OSError:
         pass
-    for rel in ("profiles", "runtime", "cache", "locks"):
+    for rel in ("profiles", "runtime", "cache", "methods", "locks"):
         path = root / rel
         path.mkdir(parents=True, exist_ok=True)
         try:
@@ -168,6 +169,84 @@ def cmd_set(args: argparse.Namespace) -> int:
     return 0
 
 
+def validate_methodology(data: dict) -> dict:
+    if not isinstance(data, dict):
+        raise ValueError("methodology must be a JSON object")
+    if int(data.get("schema_version", 0)) < 1:
+        raise ValueError("methodology is missing a valid schema_version")
+    strategy = data.get("strategy")
+    if not isinstance(strategy, dict) or not strategy:
+        raise ValueError("methodology is missing strategy")
+    forbidden = {"repository", "token", "password", "cookie", "ssh_private_key", "note_body", "raw_content"}
+
+    def walk(value, path=""):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                key_l = str(key).lower()
+                if key_l in forbidden:
+                    raise ValueError(f"methodology contains forbidden field: {path + str(key)}")
+                walk(child, path + str(key) + ".")
+        elif isinstance(value, list):
+            for child in value:
+                walk(child, path)
+
+    walk(data)
+    encoded = json.dumps(data, ensure_ascii=False).encode("utf-8")
+    if len(encoded) > 262144:
+        raise ValueError("methodology file is too large")
+    return data
+
+
+def cmd_method_read(_: argparse.Namespace) -> int:
+    root = state_root()
+    ensure_safe_state_root(root)
+    path = root / METHOD_REL
+    if not path.exists():
+        raise FileNotFoundError(f"methodology not found: {path}")
+    with path.open("r", encoding="utf-8") as fh:
+        data = validate_methodology(json.load(fh))
+    print(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_method_status(_: argparse.Namespace) -> int:
+    root = state_root()
+    ensure_safe_state_root(root)
+    path = root / METHOD_REL
+    result = {"methodology_exists": path.exists()}
+    if path.exists():
+        try:
+            data = validate_methodology(json.loads(path.read_text(encoding="utf-8")))
+            result["schema_version"] = data.get("schema_version")
+            result["strategy_name"] = data.get("strategy", {}).get("name", "<unnamed>")
+            result["note_type_count"] = len(data.get("note_types", [])) if isinstance(data.get("note_types", []), list) else 0
+        except Exception as exc:
+            result["methodology_error"] = str(exc)
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_method_write(args: argparse.Namespace) -> int:
+    root = state_root()
+    ensure_root(root)
+    source = Path(args.file).expanduser().resolve()
+    if not source.is_file():
+        raise FileNotFoundError(f"methodology input not found: {source}")
+    with source.open("r", encoding="utf-8") as fh:
+        data = validate_methodology(json.load(fh))
+    atomic_write_json(root / METHOD_REL, data)
+    print("updated private note methodology")
+    return 0
+
+
+def cmd_method_clear(_: argparse.Namespace) -> int:
+    root = state_root()
+    ensure_safe_state_root(root)
+    (root / METHOD_REL).unlink(missing_ok=True)
+    print("cleared private note methodology")
+    return 0
+
+
 def cmd_lock_acquire(args: argparse.Namespace) -> int:
     root = state_root()
     ensure_root(root)
@@ -229,6 +308,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-direct-write", dest="allow_direct_write", action="store_true")
     p.add_argument("--no-direct-write", dest="allow_direct_write", action="store_false")
     p.set_defaults(allow_direct_write=None, func=cmd_set)
+
+    p = sub.add_parser("method-read", help="print the private note methodology")
+    p.set_defaults(func=cmd_method_read)
+
+    p = sub.add_parser("method-status", help="show redacted note methodology status")
+    p.set_defaults(func=cmd_method_status)
+
+    p = sub.add_parser("method-write", help="replace the private note methodology from a JSON file")
+    p.add_argument("--file", required=True)
+    p.set_defaults(func=cmd_method_write)
+
+    p = sub.add_parser("method-clear", help="remove the private note methodology")
+    p.set_defaults(func=cmd_method_clear)
 
     p = sub.add_parser("lock-acquire", help="acquire the private GitHub write lock")
     p.add_argument("--stale-after", type=int, default=1800)
