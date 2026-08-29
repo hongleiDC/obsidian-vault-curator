@@ -1,182 +1,167 @@
 # GitHub-backed Vault workflow
 
-Use this reference when the user's Obsidian vault is stored in GitHub and the Skill is expected to read and write notes through the GitHub connector.
+Use this reference when the Vault is stored in GitHub and the Skill is expected to read and write notes through a connected GitHub capability.
 
-## Persistent vault profile
-
-The Skill supports a user-specific profile at `config/vault.yaml`.
-
-- Treat `config/vault.yaml` as private user configuration.
-- Do not commit it to the public Skill repository.
-- The public repository only contains `config/vault.example.yaml`.
-- Once the profile exists, read it at the start of every GitHub-backed task instead of asking for the repository again.
-- Never confuse the Skill source repository with the user's note repository.
-
-Recommended profile:
-
-```yaml
-schema_version: 1
-profile_name: primary-vault
-
-vault:
-  repository: owner/repository
-  branch: main
-  root: ""
-
-write:
-  mode: adaptive
-  direct_max_files: 1
-  batch_max_files: 10
-  branch_prefix: obsidian-curator/
-  merge_method: squash
-  auto_merge_safe_batches: true
-  auto_merge_risky_changes: false
-  retry_limit: 1
-  verify_after_write: true
-  commit_prefix: docs(obsidian)
-
-safety:
-  allow_create_notes: true
-  allow_delete_notes: false
-  allow_rename_or_move: false
-  allow_binary_attachment_changes: false
-```
-
-`vault.root` is relative to the repository root. Use an empty string when the repository itself is the Vault root.
+Private Vault binding is loaded from the external state directory described in `private-state.md`; never from the Skill repository.
 
 ## Startup sequence
 
-For every GitHub-backed task:
+1. Load the private profile from the external state directory.
+2. Resolve repository, base branch, and optional Vault root.
+3. Fetch repository metadata and confirm the base branch exists.
+4. Restrict reads and writes to the configured Vault root unless the user explicitly expands scope.
+5. Fetch current remote content before editing. Never rely on a body or SHA remembered from a previous conversation.
+6. Acquire the write lock before mutation when supported.
+7. Build and validate a complete change set before sending writes.
 
-1. Load `config/vault.yaml` if present.
-2. Resolve `vault.repository`, `vault.branch`, and `vault.root` from the profile.
-3. Use the GitHub connector to retrieve repository metadata and confirm the configured branch exists.
-4. Confirm the requested path belongs to the configured vault root.
-5. Read the current remote file before editing. Never rely on a copy remembered from a previous conversation.
-6. Choose a write strategy with the adaptive policy below.
+## Default policy: branch-first
 
-If the profile is absent, enter one-time setup mode. Ask for the vault repository and, only when necessary, the branch and vault root. Do not ask for these values again after a persistent profile has been created.
+The default write mode is `branch_pr` because a Vault may also be synchronized by a desktop client or another device. Do not write directly to the base branch unless private settings explicitly enable direct writes.
 
-## Adaptive write policy
+### Branch-first workflow
 
-### Direct write
+1. Resolve the latest base branch head.
+2. Create a unique temporary branch from that exact head.
+3. Read all target files from a consistent base snapshot when possible.
+4. Produce the complete final contents in memory.
+5. Run semantic-preservation checks.
+6. Commit the batch to the temporary branch.
+7. Open a pull request into the base branch.
+8. Re-check mergeability and relevant conflicts.
+9. Auto squash-merge only ordinary text-only changes when private settings allow it and validation passes.
+10. Release the write lock.
 
-Use a direct update on the configured base branch only when all of the following are true:
+Rename, move, delete, attachment, and other risky changes are never auto-merged by default.
 
-- exactly one text note is being created or updated;
-- the change does not rename, move, or delete files;
-- the change does not require coordinated edits to backlinks in other notes;
-- no binary attachment is being changed;
-- semantic-preservation checks pass.
+## Prefer one atomic batch commit
 
-Direct-write sequence:
+When GitHub Git Data operations are available, avoid one commit per file.
 
-1. Fetch the target file and record its blob SHA.
-2. Build the complete replacement content in memory. Avoid multiple partial writes.
-3. Immediately before writing, fetch the same path again.
-4. If the SHA is unchanged, update with that fresh SHA.
-5. If the SHA changed, discard the stale write plan, re-read the new content, re-apply the intended transformation, and retry once.
-6. Fetch the written file again and verify the result when `verify_after_write` is true.
+For a batch:
 
-### Branch + pull request
+1. Build one final change set first.
+2. Create blobs for changed text files.
+3. Create one tree using the current base tree.
+4. Create one commit with the expected parent commit.
+5. Move the temporary branch ref once.
 
-Use a temporary branch when any of the following is true:
+This reduces API calls, commit noise, stale-SHA races, and partial multi-file updates.
 
-- two or more files are changed;
-- links are coordinated across notes;
-- Frontmatter or taxonomy is normalized across multiple files;
-- a note is renamed or moved;
-- a note is deleted;
-- more than one backlink must be rewritten;
-- the change is otherwise difficult to validate as one isolated file update.
+If atomic Git Data operations are not available, fall back to sequential file updates on the temporary branch:
 
-Branch workflow:
+- fetch each path immediately before updating it;
+- use the fresh blob SHA;
+- write each path at most once per logical batch;
+- never write the same path concurrently.
 
-1. Resolve the latest base branch state.
-2. Create a unique branch under `write.branch_prefix`, for example `obsidian-curator/20260829-topic`.
-3. Apply changes sequentially on that branch. Do not write the same path in parallel.
-4. For every existing file, fetch the file on the temporary branch immediately before updating it and use the fresh blob SHA.
-5. Validate all changed notes.
-6. Open a pull request into the configured base branch.
-7. For ordinary text-only curation, squash-merge automatically only when `auto_merge_safe_batches` is true and validation passed.
-8. Never auto-merge rename, move, delete, attachment, or other risky changes unless `auto_merge_risky_changes` is explicitly enabled.
+## Optional direct write
 
-Squash merging keeps the base branch history readable even when several file-level commits were needed on the temporary branch.
+Direct base-branch updates are opt-in. Use them only when all conditions are true:
+
+- private policy explicitly enables direct write;
+- exactly one text note is created or updated;
+- there is no rename, move, delete, attachment change, or coordinated backlink change;
+- preservation validation passes.
+
+Direct sequence:
+
+1. Fetch the target and record the current SHA.
+2. Build complete replacement content.
+3. Fetch the target again immediately before writing.
+4. If SHA is unchanged, update using the fresh SHA.
+5. If SHA changed, re-apply the intended transformation to the latest content and retry once.
+6. Re-read and verify the result.
 
 ## Batch size
 
-Use `write.batch_max_files` as a safety ceiling, not a performance target.
+Treat the configured batch maximum as a safety ceiling, not a performance target.
 
-- Default: at most 10 changed notes in one batch.
-- Split larger vault-wide cleanup into coherent topic or directory batches.
-- Do not attempt one giant whole-vault rewrite.
+- Default maximum: 10 changed notes.
+- Split larger work into coherent directory or topic batches.
+- Never start with a whole-vault rewrite.
 
 ## Conflict and retry policy
 
 The Skill must not enter a repeated push-error loop.
 
-### Stale SHA / conflict
+### Stale SHA or changed content
 
-For a conflict caused by a stale file SHA or concurrently changed content:
-
-1. Fetch the latest remote file.
-2. Re-apply the intended transformation to the latest content.
+1. Refresh the latest remote content.
+2. Re-apply the intended transformation.
 3. Retry once.
-4. If the second attempt fails, stop writing that path and report the conflict.
+4. If it fails again, stop that path or batch and report a conflict.
 
-Never repeatedly submit the same stale SHA.
+Never submit the same stale SHA repeatedly.
 
-### Missing file / wrong operation
+### Temporary branch ref conflict
 
-- If a file exists, use an update operation with its current SHA.
-- If a file does not exist and creation is allowed, use a create operation.
-- Do not repeatedly try `create` on an existing path or `update` on a missing path.
+A temporary branch should be owned by one task. If its ref moves unexpectedly:
+
+- do not force-update it;
+- create one fresh branch from the newest intended base and rebuild once;
+- on a second failure, stop.
+
+### Base branch changed during work
+
+A newer base commit is normal. Before merge:
+
+- check PR mergeability;
+- identify whether touched paths conflict;
+- never force-merge a conflicted PR;
+- if a clean automatic update/rebase is not available, leave the PR unmerged and report the blocking paths.
+
+### Missing file or wrong operation
+
+- Existing path: update using its current state.
+- Missing path: create only when creation is allowed.
+- Do not loop between create and update attempts.
 
 ### Permission or authentication failure
 
-Stop immediately. Do not retry writes when the connector lacks permission or authentication.
+Stop immediately. Do not retry writes without a change in authorization state.
 
 ### Branch-name collision
 
-Generate a different suffix once. Do not repeatedly attempt the same branch name.
+Generate one new suffix. If the retry also collides, stop.
 
 ### Unchanged content
 
-If the proposed content is byte-for-byte identical to the current remote content, skip the write and do not create a no-op commit.
+Skip byte-identical changes. Do not create empty commits or no-op PRs.
 
 ## Write serialization
 
+- Use the private write lock when available.
 - Never issue concurrent writes to the same path.
 - Prefer one complete write per note per task.
-- When the same file must be updated again after a successful write, use the newly returned content SHA or re-fetch the file first.
-- Writes to different files on a temporary branch may still be performed sequentially for easier failure recovery and traceability.
+- Prefer one atomic commit for each multi-file batch.
+- Release locks on both success and handled failure.
 
 ## Commit conventions
 
-Use concise commit messages with the configured prefix.
+Use concise generic messages that describe the operation, not private note details when avoidable.
 
 Examples:
 
 ```text
-docs(obsidian): curate ROS Noetic note
-docs(obsidian): normalize GNSS note properties
-docs(obsidian): link three TF debugging notes
+docs(obsidian): curate one note
+docs(obsidian): normalize note metadata batch
+docs(obsidian): refresh validated vault links
 ```
 
-For branch workflows, the pull request title should describe the logical batch rather than list every file.
+PR titles should describe the logical operation rather than list private filenames.
 
 ## Read strategy
 
-- When the user provides an exact path, fetch that path directly.
-- When the user gives a note title but not a path, search only inside the configured note repository first.
-- If multiple files match the same title/stem, do not guess. Resolve the ambiguity using folder context, links, or the user's requested topic.
-- Always use the configured repository as the default scope unless the user explicitly asks to work elsewhere.
+- Exact path: fetch it directly.
+- Note title without path: search only inside the configured private Vault first.
+- Multiple matches: resolve using folder context or links; do not guess.
+- Never broaden to unrelated repositories unless the user explicitly asks.
 
 ## Attachments
 
 GitHub-backed curation is text-first.
 
-- Preserve existing attachment paths and embeds.
+- Preserve existing attachment targets and embeds.
 - Do not rename or move binary attachments by default.
-- Do not attempt binary writes through a text-only file operation.
-- Attachment migration is a risky multi-file operation and must use the branch workflow when supported.
+- Do not write binary content through text-only file operations.
+- Attachment migration is a risky branch workflow and requires explicit permission.

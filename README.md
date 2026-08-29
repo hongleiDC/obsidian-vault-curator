@@ -1,106 +1,109 @@
 # Obsidian Vault Curator
 
-> Curate your Obsidian vault without breaking what makes it a vault.
+> Curate an Obsidian vault without publishing the private state that locates it.
 
-**Obsidian Vault Curator** is a ChatGPT Skill for safely organizing, restructuring, linking, and maintaining Obsidian Markdown notes and vaults. It is designed especially for a **GitHub-backed personal Obsidian vault**: the Skill can remember which repository is the user's vault through a private profile, read current notes from GitHub, and write changes back with a conflict-aware strategy.
+Obsidian Vault Curator is a ChatGPT Skill for safely organizing, restructuring, linking, and maintaining Obsidian Markdown notes. It is designed for Vaults stored in GitHub while keeping all user-specific repository bindings **outside the public Skill repository and outside the Skill package**.
 
-中文简介：这是一个用于安全整理、重构和维护 Obsidian 知识库的 ChatGPT Skill。它特别适合把 Obsidian Vault 长期保存在 GitHub 的场景：一次绑定笔记仓库后，后续新对话可直接恢复仓库、分支和 Vault 根目录，不需要反复输入地址。
+## Core idea
 
-## Why this project exists
+The project separates three things that should never be mixed:
 
-Many note-cleaning workflows treat Obsidian files as ordinary Markdown. That can make notes look cleaner while silently damaging the structures that make a vault useful.
+```text
+Public Skill source
+      │
+      ├── generic instructions, scripts and fictional examples
+      │
+External private state directory
+      │
+      ├── Vault repository binding and write preferences
+      │
+Private GitHub Vault
+      └── the actual Obsidian notes and attachments
+```
 
-This project follows a stricter principle:
-
-> **Preserve semantics first. Improve structure second. Add knowledge relationships only when they are real.**
-
-For GitHub-backed vaults, it adds another principle:
-
-> **Always read the current remote state before writing, and never enter an unlimited push-retry loop.**
+The public project never needs a real Vault repository identifier, real note path, copied private note, or credential.
 
 ## Features
 
-### Persistent GitHub vault binding
+- Single-note and multi-note curation.
+- Frontmatter / Properties merge instead of destructive replacement.
+- Conservative wikilink validation.
+- Protection for embeds, tasks, block IDs, Dataview fields, code, formulas, footnotes, comments, and callout state.
+- External private state directory for persistent Vault binding.
+- GitHub branch-first write strategy with finite retries.
+- Atomic multi-file commit strategy when Git Data operations are available.
+- Semantic-preservation verification scripts.
+- Vault indexing for safer cross-note linking.
 
-A user-specific `config/vault.yaml` can store:
+## Private persistent state
 
-- GitHub repository (`owner/repository`)
-- default branch
-- Vault root directory inside the repository
-- direct-write vs branch/PR policy
-- batch size and merge behavior
-- safety switches for create/delete/rename/attachments
+The Skill resolves a private state directory in this order:
 
-The public repository contains only [`config/vault.example.yaml`](config/vault.example.yaml). The real `config/vault.yaml` is ignored by Git so a private repository address does not need to be published with the Skill source.
+1. `OBSIDIAN_CURATOR_STATE_DIR` if configured.
+2. Otherwise `~/.obsidian-vault-curator/`.
 
-Once the personal profile exists, the Skill reads it at the beginning of every GitHub-backed task instead of asking for the repository again.
+The private directory is intentionally **not part of this repository** and must not be placed inside the installed Skill package or the Vault repository.
 
-### Conflict-aware GitHub writes
-
-The default strategy is adaptive:
-
-- **One safe text-note change** → update the configured base branch directly.
-- **Two or more changed files** → temporary branch + pull request.
-- **Cross-note linking or metadata normalization** → temporary branch + pull request.
-- **Rename, move, delete, backlink migration, or attachment changes** → temporary branch and no automatic merge by default.
-
-For direct writes the Skill re-fetches the file immediately before updating it and uses the fresh blob SHA. If the remote file changed, it re-applies the intended edit to the newest content and retries **once only**.
-
-This avoids common GitHub Contents API failure loops caused by reusing a stale SHA or repeatedly calling create/update with the wrong operation.
-
-### Single-note curation
-
-- Reorganize headings, paragraphs, lists, tables, and callouts.
-- Merge existing Frontmatter / Obsidian Properties instead of replacing them.
-- Preserve facts, numbers, conclusions, citations, and qualifiers.
-- Keep formatting restrained and readable instead of decorative.
-
-### Vault-aware curation
-
-- Work with multiple notes or a complete vault.
-- Detect duplicate note stems when a local index is available.
-- Validate headings, block IDs, wikilinks, and embeds.
-- Add cross-note links only when the destination actually exists and the relation is meaningful.
-
-### Semantic protection
-
-The Skill treats the following as protected content by default:
-
-- YAML Frontmatter / custom Properties
-- `[[wikilinks]]`, heading links, and block links
-- `![[embeds]]` and attachment paths
-- fenced code blocks and inline code
-- LaTeX / MathJax formulas
-- tasks such as `- [ ]` and `- [x]`
-- Dataview fields such as `key:: value`
-- block IDs such as `^reference-block`
-- footnotes, quotations, comments, and callout state
-
-### Concept patches
-
-When a user asks what a term means, the Skill can add a small, clearly marked, collapsible explanation next to the original sentence instead of rewriting the entire note.
-
-### Safety verification
-
-The bundled verification script compares an original note with the curated result and reports protected constructs that disappeared or changed unexpectedly.
-
-## Workflow
+Typical local layout:
 
 ```text
-Persistent vault profile
-    ↓
-Read current GitHub state
-    ↓
-Protect Obsidian semantics
-    ↓
-Restructure content
-    ↓
-Validate real vault relationships
-    ↓
-Choose direct write or temporary branch
-    ↓
-Verify remote result
+~/.obsidian-vault-curator/
+├── profiles/default.json
+├── runtime/last-success.json
+├── cache/vault-index.json
+└── locks/github-write.lock
 ```
+
+Initialize a binding only in the private state directory:
+
+```bash
+python scripts/state_store.py init --repository <your-private-value>
+```
+
+The repository value above is supplied at runtime; it is never stored in this public source tree.
+
+Check state without exposing the repository identifier:
+
+```bash
+python scripts/state_store.py status
+```
+
+The helper uses atomic writes and attempts private filesystem permissions where supported. Authentication tokens are never stored; GitHub authentication remains with the connector.
+
+> Persistence depends on the execution environment providing a persistent writable directory. If it does not, the Skill must not fall back to embedding private binding data in the Skill ZIP or public repository.
+
+## GitHub write strategy
+
+The default policy is **branch-first**:
+
+```text
+latest base branch
+      ↓
+unique temporary branch
+      ↓
+build + validate complete change set
+      ↓
+one atomic commit when possible
+      ↓
+pull request
+      ↓
+mergeability/conflict check
+      ↓
+squash merge for safe text-only changes
+```
+
+This avoids repeatedly writing the same path with stale SHAs and reduces partial multi-file updates.
+
+Direct writes to the base branch are disabled by default and can only be enabled through the private state profile.
+
+The Skill also enforces:
+
+- no concurrent writes to the same path;
+- one refresh-and-retry for stale SHA/ref conflicts;
+- no repeated permission/auth retries;
+- no empty commits;
+- no force merge for conflicted PRs;
+- risky rename/move/delete/attachment changes require explicit permission and are not auto-merged by default.
 
 ## Project structure
 
@@ -109,129 +112,67 @@ obsidian-vault-curator/
 ├── SKILL.md
 ├── agents/
 │   └── openai.yaml
-├── config/
-│   └── vault.example.yaml
 ├── scripts/
 │   ├── build_vault_index.py
+│   ├── state_store.py
 │   └── verify_note_preservation.py
 └── references/
-    ├── github-backend.md
+    ├── examples.md
     ├── formatting-rules.md
-    ├── vault-linking.md
-    └── examples.md
+    ├── github-backend.md
+    ├── private-state.md
+    └── vault-linking.md
 ```
 
-## Installation
-
-Download or clone this repository and install the repository folder as a ChatGPT Skill using the Skills interface available in your ChatGPT environment.
-
-The Skill entrypoint is:
-
-```text
-SKILL.md
-```
-
-### One-time personal vault setup
-
-Copy the example profile to a private `config/vault.yaml` in the Skill package or working copy and fill in your own vault:
-
-```yaml
-vault:
-  repository: owner/repository
-  branch: main
-  root: ""
-```
-
-Do **not** commit `config/vault.yaml` to this public repository if the repository name or personal setup should remain private.
+There is deliberately no user `config/` directory in the project.
 
 ## Example prompts
 
-After the vault profile is configured, prompts no longer need the repository URL:
-
 ```text
-整理我的 ROS Noetic 笔记，并保存回仓库。
+Curate the note I named from my bound Vault. Preserve all existing semantics and use the safe GitHub write policy.
 ```
 
 ```text
-检查我最近几篇 GNSS 笔记的结构和双链，只修改确实需要整理的文件。
+Audit this folder of notes for broken structure and unverified links, but do not write anything yet.
 ```
 
 ```text
-把 TF debugging 相关笔记重新整理一下，多文件修改使用安全分支策略。
+Explain this term as a compact Obsidian concept patch without reorganizing the rest of the note.
 ```
-
-You can still use the Skill on uploaded or pasted Markdown:
-
-```text
-Use Obsidian Vault Curator to reorganize this note. Preserve all existing facts,
-code, formulas, tasks, Properties, attachments, and wikilinks.
-```
-
-## GitHub write policy
-
-Detailed GitHub behavior is documented in [`references/github-backend.md`](references/github-backend.md).
-
-Key rules:
-
-1. Always fetch the current remote file before editing.
-2. Fetch again immediately before a direct update and use the newest SHA.
-3. Never write the same path concurrently.
-4. Prefer one complete update per file per task.
-5. Retry stale-SHA conflicts once, then stop.
-6. Skip no-op commits.
-7. Use a temporary branch for coordinated multi-file changes.
-8. Squash safe batches to keep the main history readable.
 
 ## Vault indexing
 
-When the Vault is also available locally, build a lightweight index before multi-note or vault-wide linking:
+For a locally materialized Vault:
 
 ```bash
 python scripts/build_vault_index.py /path/to/vault --output /tmp/vault-index.json
 ```
 
-The index includes note paths, stems, first H1 titles, headings, block IDs, wikilinks, embeds, and duplicate stems.
-
-For a GitHub-only vault, use the configured repository and GitHub connector as the source of truth instead of assuming a local clone exists.
+The index is derived private data. Store persistent indexes only in the external private state directory, never in this public repository.
 
 ## Preservation verification
-
-After curating a local or materialized note, compare it with the original:
 
 ```bash
 python scripts/verify_note_preservation.py original.md curated.md
 ```
 
-The script returns a non-zero exit code when protected constructs appear to be missing or modified unexpectedly.
+A non-zero exit code indicates protected constructs may have disappeared or changed unexpectedly.
 
 ## Design principles
 
-1. **Do not invent content.** Reorganize existing knowledge unless the user explicitly asks for additions.
-2. **Do not manufacture links.** A plausible concept name is not enough to create a wikilink.
-3. **Merge metadata instead of replacing it.** Unknown Properties may be important to plugins or personal workflows.
-4. **Do not optimize for Graph View density.** Links should improve navigation or understanding.
-5. **Avoid whole-vault rewrites by default.** Curate in small, verifiable batches.
-6. **Do not automatically rename or move files.** Those operations require backlink-aware migration.
-7. **Keep Markdown restrained.** Structure should clarify knowledge rather than decorate it.
-8. **Do not reuse stale GitHub SHAs.** Re-read before writing.
-9. **Do not retry forever.** One conflict refresh/retry is the default ceiling.
-
-## Roadmap
-
-Potential future directions include:
-
-- orphan-note and broken-link auditing
-- duplicate / near-duplicate note detection
-- MOC recommendation and knowledge-cluster discovery
-- tag-governance reports
-- backlink-aware note rename / move workflows
-- configurable PARA, Zettelkasten, MOC, and custom taxonomy support
-- larger-vault incremental indexing
+1. Preserve semantics before improving appearance.
+2. Never invent knowledge relationships.
+3. Merge metadata instead of replacing unknown fields.
+4. Keep private binding and private note content out of Skill source, packages, fixtures, and examples.
+5. Prefer a temporary branch and one logical commit over repeated file-by-file pushes.
+6. Retry conflicts at most once after refreshing state.
+7. Do not force risky operations through automation.
+8. Keep Markdown restrained and readable.
 
 ## Inspiration
 
-This project was inspired by the lightweight, restrained curation philosophy of [`qfzhao670/obsidian-curator-skill`](https://github.com/qfzhao670/obsidian-curator-skill), then independently expanded toward GitHub-backed vault persistence, semantic preservation, conservative link validation, and conflict-aware writes.
+The project was inspired by the restrained curation philosophy of `qfzhao670/obsidian-curator-skill`, then independently expanded toward semantic preservation, vault-level validation, external private state, and safer GitHub write workflows.
 
 ## License
 
-Licensed under the Apache License 2.0. See [`LICENSE`](LICENSE).
+Apache-2.0.

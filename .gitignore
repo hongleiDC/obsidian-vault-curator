@@ -9,6 +9,8 @@ Thumbs.db
 *.log
 .vault-index.json
 
-# User-specific vault profile. Keep private repository addresses out of the public skill repo.
-config/vault.yaml
-config/*.local.yaml
+# Defense in depth: private state must live outside this repository.
+.obsidian-vault-curator/
+.private-state/
+*.private.json
+*.private.yaml
