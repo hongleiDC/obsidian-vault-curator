@@ -1,137 +1,157 @@
-# Adaptive note methodology and Vault architecture
+# Adaptive note methodology and namespace organization
 
-Use this reference when the Skill needs to understand an existing Vault before deciding how to organize it.
+Use this reference when diagnosing a Vault, selecting a note method, or deciding where a note should live.
 
-## Principle
+## 1. Diagnose before redesign
 
-Do not force one fashionable system onto every Vault. First inspect the user's real data shape and workflows, then choose the smallest useful hybrid method.
+Do not impose a fashionable framework first. Observe the existing Vault and answer:
 
-## Diagnosis
+- What directory depths and naming patterns already recur?
+- Which Frontmatter keys/tags/links/tasks are stable?
+- Which notes are capture, source, log, project, concept, decision, how-to, reference, or hub/MOC?
+- Where are source material and personal synthesis mixed?
+- Which project logs contain conclusions that should be promoted?
+- Are folders, tags, Properties and links redundantly encoding the same taxonomy?
 
-Before major restructuring, inspect aggregate structural signals:
-- note count and length distribution;
-- directory depth and recurring top-level folders;
-- date-based filenames and daily/log patterns;
-- Frontmatter keys and Properties consistency;
-- tags and aliases;
-- wikilinks, embeds, headings and block IDs;
-- tasks and status fields;
-- source/url/reference patterns;
-- code, formulas, tables, callouts and Dataview;
-- recurring project, meeting, experiment, decision, how-to or reference structures.
+Use aggregate analysis whenever possible. Avoid copying private note bodies into reports.
 
-When a materialized Vault is available, use:
+## 2. Functional note types
 
-```bash
-python scripts/analyze_vault_patterns.py <vault-root> --output <private-report.json>
-```
+Prefer a hybrid system. Typical contracts:
 
-The report should contain aggregate structure metrics by default, not raw note bodies.
+- **Capture**: fast intake; minimal formatting; process later.
+- **Source**: preserve external evidence and citation; keep synthesis separate.
+- **Log / Daily / Experiment**: preserve chronology, attempts, observations and outcomes.
+- **Project**: current objective, status, next actions, decisions and blockers.
+- **Concept / Evergreen**: independently reusable understanding; split only when reuse is real.
+- **Decision**: context, options, choice, rationale, consequences.
+- **How-to / Troubleshooting**: goal/symptom, evidence, steps, validation, failure modes.
+- **Reference**: quick lookup; tables/lists often beat long prose.
+- **MOC / Hub**: curated navigation across a mature cluster, not a backlink dump.
 
-## Diagnose workflow friction, not just inconsistent formatting
+Do not force every type into the same template.
 
-Look for problems such as:
-- source material mixed with the user's own conclusions;
-- project logs treated as permanent concept notes;
-- useful conclusions trapped in daily notes;
-- folder, tag and link systems redundantly encoding the same classification;
-- project context disappearing when conversations change;
-- excessive nesting making navigation harder than search/linking;
-- MOCs that are only backlink dumps;
-- templates that create fields nobody maintains.
+## 3. Separate organization mechanisms
 
-## Functional note types
+Give each mechanism one main job:
 
-Use note types as functional contracts, not rigid templates.
+- folders: coarse physical placement;
+- Properties: stable structured metadata;
+- tags: cross-cutting workflow/state/topic categories;
+- wikilinks: semantic relations between concrete notes;
+- MOCs: curated navigation and synthesis.
 
-- **Capture**: fast intake; minimal structure.
-- **Source / Literature**: external evidence, citation and extraction; keep synthesis separate.
-- **Log / Daily / Experiment**: preserve chronology, observations, attempts and outcomes.
-- **Project**: current goal, status, workstream, actions, decisions and progress.
-- **Concept / Evergreen**: reusable understanding with independent long-term value.
-- **Decision record**: choice, alternatives, evidence and why it was made.
-- **How-to / Troubleshooting**: symptom/goal, evidence, steps, verification and failure modes.
-- **Reference**: fast lookup; tables/lists may be better than prose.
-- **MOC / Hub**: navigation for a real mature knowledge cluster, not a raw backlink list.
+Avoid encoding the same hierarchy in all five.
 
-A Vault may use several of these at once.
+## 4. Namespace-first shallow hierarchy
 
-## Project-first shallow directory policy
+Preserve the user's established namespace grammar. Default maximum directory depth: **3 folders relative to the Vault root**.
 
-The default directory strategy should support real work without creating deep trees.
-
-Directory depth is counted relative to the Vault root. Target depth should normally be **no more than 3 folders**.
-
-Preferred default:
+Generic pattern:
 
 ```text
-<Project>/<Category>/<Note>.md
+NB.<AREA>/<PREFIX>.<PROJECT>/<Note>.md
 ```
 
-Use a third folder only when a real phase/workstream is large enough to justify it:
+Optional one-level project-internal grouping:
 
 ```text
-<Project>/<Category>/<Workstream>/<Note>.md
+NB.<AREA>/<PREFIX>.<PROJECT>/<GROUP>/<Note>.md
 ```
 
 Rules:
-- project-bound work should usually use a stable project name as the first folder level;
-- the second level should be one of a small number of useful functional categories, for example `Notes`, `Meetings`, `Sources`, `Experiments`, `Decisions`, `Reference`;
-- the third level is exceptional, not routine;
-- do not create folders to mirror every tag, month, note type or heading;
-- use Properties, tags, wikilinks and MOCs for cross-cutting classification instead of deeper folders;
-- a note does not need to move just because a different taxonomy could theoretically fit it;
-- when the current Vault is deeper than three levels, propose a shallow target first and migrate in coherent PR batches with backlink verification; never flatten the whole Vault destructively in one pass.
 
-## Project context and note method must cooperate
+1. Level 1 is a stable high-level namespace such as `NB.<AREA>`.
+2. Level 2 is a concrete research/work/project unit named `<PREFIX>.<ProjectName>`.
+3. Multiple configured level-2 prefixes are peers by default; they identify project/research directions, not note types.
+4. Never infer semantics from prefix spelling. A token that looks like `NAV` is not automatically a navigation note, MOC or Hub.
+5. Prefix meaning must come from private methodology state.
+6. Level 3 is optional and only for a genuinely useful project-internal group/stage/workstream.
+7. Do not create a fourth folder level. Use Properties, tags, wikilinks or MOC for cross-cutting structure.
+8. Preserve established spelling exactly; do not "correct" a user's namespace name.
+9. Flattening an existing deep tree is a migration, not formatting. Move in coherent PR batches and verify backlinks/embeds.
 
-Project progress state tells the Skill **where the work currently is**. Note methodology tells it **how each kind of note should be structured**.
+## 5. Persist naming semantics privately
 
-For project tasks:
-1. load project state first;
-2. identify the note's functional type;
-3. apply the appropriate note contract;
-4. keep the directory structure shallow and project-oriented;
-5. update project progress only after the GitHub PR lifecycle succeeds.
+The public Skill should support arbitrary namespace/prefix schemes. Actual user roots, prefixes, meanings and project names belong in private `methods/note-system.json`.
 
-Do not turn project progress files into notes inside the Vault unless the user explicitly requests a human-readable project dashboard note. The private project state exists to preserve agent workflow context across conversations.
+Recommended private structure:
 
-## Folder / Properties / tags / links / MOC division of labor
+```json
+{
+  "schema_version": 1,
+  "strategy": {
+    "name": "hybrid-project-notes"
+  },
+  "organization": {
+    "max_folder_depth": 3,
+    "namespace_roots": ["NB.<AREA>"],
+    "project_unit_pattern": "<PREFIX>.<ProjectName>",
+    "project_prefixes": {
+      "PX": "example domain A",
+      "QX": "example domain B"
+    },
+    "third_level_policy": "optional-project-internal-group-only"
+  },
+  "note_types": [
+    {"name": "project", "purpose": "current outcome and progress"},
+    {"name": "concept", "purpose": "reusable understanding"},
+    {"name": "source", "purpose": "external evidence"},
+    {"name": "log", "purpose": "chronological work record"}
+  ]
+}
+```
 
-Prefer clear responsibilities:
-- **folders**: stable ownership/context, especially project and broad category;
-- **Properties**: structured metadata needed for filtering/querying;
-- **tags**: small set of stable cross-cutting themes or workflow states;
-- **wikilinks**: semantic relationships between real notes;
-- **MOC / Hub**: curated navigation where a cluster genuinely needs a map.
+Use fictional prefix values in public docs/tests. Real user mappings remain private.
 
-Avoid encoding the same hierarchy in all five systems.
+## 6. Project progress and note placement
 
-## Method selection
+A continuing project state normally maps to the level-2 project unit, regardless of prefix. The prefix is part of project identity but not a note type.
 
-Prefer the smallest viable hybrid system. Do not recommend PARA, Zettelkasten, Johnny Decimal or another branded method only because it is popular. Borrow useful ideas only when they solve observed friction.
+When curating a note:
 
-## Pilot before migration
+1. resolve the active project state;
+2. load private namespace/prefix mapping;
+3. determine the note's functional type;
+4. place it within that project's existing shallow structure;
+5. create the optional third level only if several notes truly need that grouping;
+6. prefer metadata/links over deeper folders.
 
-Before applying a new method broadly:
-1. choose 5–15 representative notes across important note types;
-2. curate them using the proposed method;
-3. check retrieval, readability, maintenance cost, link quality and project usefulness;
-4. adjust the method;
-5. only then expand to a larger batch.
+## 7. Pilot before migration
 
-Do not start with a whole-vault rewrite.
+Before a large restructure:
 
-## Persist accepted methodology
+1. choose 5–15 representative notes;
+2. map them to proposed functional types;
+3. curate them using the proposed namespace/project structure;
+4. evaluate retrieval, readability, linking and maintenance cost;
+5. adjust the method;
+6. only then apply to larger batches.
 
-After the user accepts the method, save it only in external private `methods/note-system.json` using `state_store.py`. Future tasks load it instead of redesigning the system every time.
+Never redesign hundreds of notes from one attractive template.
 
-Re-diagnose only when:
-- the user asks for a redesign;
-- the methodology is missing;
-- the Vault has materially drifted;
-- repeated real-use failures show the current method is no longer useful.
+## 8. Persistence and drift
 
-## Preserve heterogeneity when it is useful
+Persist an accepted method with `scripts/state_store.py method-write`. Future tasks load it instead of redesigning every time.
 
-Do not force every note into the same headings or metadata. A troubleshooting note, meeting log, paper note and evergreen concept have different jobs. Consistency is valuable only where it reduces cognitive load or improves retrieval.
+Re-run diagnosis only when:
+
+- the user asks to redesign;
+- methodology is missing;
+- the Vault changes substantially;
+- repeated notes no longer fit the current contracts;
+- the current method causes friction;
+- a new major workflow appears.
+
+## 9. Anti-patterns
+
+Do not:
+
+- interpret a project prefix as a note type from its spelling;
+- create a navigation/MOC note merely because a prefix resembles `NAV`;
+- create deep folder trees for every subtopic;
+- force all research projects into one content template;
+- turn logs into polished evergreen prose;
+- split sources into artificial atoms;
+- create MOCs for tiny clusters;
+- copy real user project names into public Skill examples or fixtures.
