@@ -121,3 +121,9 @@ MOC         → curated navigation across mature clusters
 ```
 
 Pilot the method on a small representative set before changing the rest of the Vault. If the user accepts it, persist only the methodology in the external private state directory.
+
+## Example: ambiguous instruction must pause
+
+Fictional user request: “Move the test notes into the new project and clean them up.”
+
+If the Vault contains two candidate projects or two candidate test-note groups, do not choose one. First inspect private project state and the current Vault. If ambiguity remains, ask one short round such as which project and which note group are intended. Only after those answers remove all material ambiguity should the Skill edit files or open a PR.
