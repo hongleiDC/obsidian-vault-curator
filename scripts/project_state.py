@@ -80,7 +80,7 @@ def cmd_init(args):
     root = state_root(); ensure_root(root); pid = valid_id(args.id); path = project_path(root, pid)
     if path.exists() and not args.force: raise ValueError(f"project already exists: {pid}")
     now = int(time.time())
-    data = {"schema_version":1,"project_id":pid,"project_name":args.name.strip(),"aliases":args.alias or [],"status":"active","phase":args.phase or "","current_focus":args.focus or "","completed":[],"next_actions":[],"blockers":[],"decisions":[],"working_set":{"note_paths":[],"folders":[]},"last_github":{"pr_number":None,"merge_commit":"","branch":""},"created_at":now,"updated_at":now}
+    data = {"schema_version":1,"project_id":pid,"project_name":args.name.strip(),"aliases":args.alias or [],"status":"active","phase":args.phase or "","current_focus":args.focus or "","completed":[],"next_actions":[],"blockers":[],"decisions":[],"working_set":{"note_paths":[],"folders":[]},"intent":{"status":"ready","summary":"","pending_questions":[],"confirmed_at":0},"last_github":{"pr_number":None,"merge_commit":"","branch":""},"created_at":now,"updated_at":now}
     validate_project(data); atomic_write(path, data)
     idx = load_index(root); idx.setdefault("projects", {})[pid] = {"name":data["project_name"],"aliases":data["aliases"],"status":"active","updated_at":now}; idx["active_project_id"] = pid; save_index(root, idx)
     print(f"initialized project: {pid}")
@@ -98,7 +98,7 @@ def cmd_read(args):
 
 def cmd_status(args):
     root=state_root(); ensure_root(root); pid=resolve(root,args.id); d=validate_project(read_json(project_path(root,pid)))
-    keys=("project_id","project_name","status","phase","current_focus","completed","next_actions","blockers","decisions","last_github","updated_at")
+    keys=("project_id","project_name","status","phase","current_focus","completed","next_actions","blockers","decisions","intent","last_github","updated_at")
     print(json.dumps({k:d.get(k) for k in keys}, ensure_ascii=False, indent=2, sort_keys=True))
 
 def cmd_update(args):
@@ -109,6 +109,17 @@ def cmd_update(args):
         if vals: d.setdefault(key, []).extend(v.strip() for v in vals if v.strip())
     if args.clear_next: d["next_actions"]=[]
     if args.clear_blockers: d["blockers"]=[]
+    intent=d.setdefault("intent", {"status":"ready","summary":"","pending_questions":[],"confirmed_at":0})
+    if args.intent_status is not None: intent["status"] = args.intent_status
+    if args.intent_summary is not None: intent["summary"] = args.intent_summary.strip()
+    if args.clear_pending_questions: intent["pending_questions"] = []
+    if args.pending_question:
+        intent.setdefault("pending_questions", []).extend(v.strip() for v in args.pending_question if v.strip())
+        intent["status"] = "needs_clarification"
+    if args.confirm_intent:
+        intent["status"] = "ready"
+        intent["pending_questions"] = []
+        intent["confirmed_at"] = int(time.time())
     lg=d.setdefault("last_github", {})
     if args.pr_number is not None: lg["pr_number"]=args.pr_number
     if args.merge_commit is not None: lg["merge_commit"]=args.merge_commit.strip()
@@ -124,7 +135,7 @@ def parser():
     q=sub.add_parser("use"); q.add_argument("--id",required=True); q.set_defaults(func=cmd_use)
     for name,func in (("read",cmd_read),("status",cmd_status)):
         q=sub.add_parser(name); q.add_argument("--id"); q.set_defaults(func=func)
-    q=sub.add_parser("update"); q.add_argument("--id"); q.add_argument("--phase"); q.add_argument("--focus"); q.add_argument("--status",choices=["active","paused","done","archived"]); q.add_argument("--completed",action="append"); q.add_argument("--next-action",action="append"); q.add_argument("--blocker",action="append"); q.add_argument("--decision",action="append"); q.add_argument("--clear-next",action="store_true"); q.add_argument("--clear-blockers",action="store_true"); q.add_argument("--pr-number",type=int); q.add_argument("--merge-commit"); q.add_argument("--branch"); q.set_defaults(func=cmd_update)
+    q=sub.add_parser("update"); q.add_argument("--id"); q.add_argument("--phase"); q.add_argument("--focus"); q.add_argument("--status",choices=["active","paused","done","archived"]); q.add_argument("--completed",action="append"); q.add_argument("--next-action",action="append"); q.add_argument("--blocker",action="append"); q.add_argument("--decision",action="append"); q.add_argument("--clear-next",action="store_true"); q.add_argument("--clear-blockers",action="store_true"); q.add_argument("--intent-status",choices=["ready","needs_clarification"]); q.add_argument("--intent-summary"); q.add_argument("--pending-question",action="append"); q.add_argument("--clear-pending-questions",action="store_true"); q.add_argument("--confirm-intent",action="store_true"); q.add_argument("--pr-number",type=int); q.add_argument("--merge-commit"); q.add_argument("--branch"); q.set_defaults(func=cmd_update)
     return p
 
 def main():
