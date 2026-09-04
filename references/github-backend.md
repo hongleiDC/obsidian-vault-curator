@@ -1,117 +1,87 @@
 # GitHub-backed Vault workflow
 
-Use this reference whenever the Vault is stored in GitHub. Private Vault binding comes only from the external state directory described in `private-state.md`.
+Use this reference for any GitHub-backed Vault mutation.
 
 ## Startup
 
-1. Load the private Vault profile.
-2. Load current project progress before editing.
-3. Resolve repository, base branch and optional Vault root.
-4. Confirm repository and base branch access.
-5. Restrict reads and writes to the configured Vault root unless the user explicitly expands scope.
-6. Fetch current remote content; never trust a body or SHA remembered from another conversation.
-7. Acquire the private write lock when supported.
-8. Build and validate the complete change set before mutation.
+1. Load private Vault profile, methodology and project progress.
+2. Resolve repository, base branch, Vault root and active project.
+3. Fetch current remote content; never trust a body/SHA from another conversation.
+4. Acquire the private write lock.
+5. Build and validate the complete change set before sending writes.
 
-## Mandatory policy: PR-only
+## Mandatory PR-only policy
 
-Every GitHub mutation must use a temporary branch and pull request. Direct writes to the base branch are forbidden, including single-note edits.
+Every GitHub mutation uses a temporary branch and PR. Direct base-branch writes are forbidden, including one-note edits.
 
-### PR workflow
+## Cleanup preflight
 
-1. Resolve the latest base head.
-2. Create a unique temporary branch from that exact head.
-3. Read target files from a consistent snapshot when possible.
-4. Produce final contents in memory.
-5. Run preservation and link checks.
-6. Prefer one atomic batch commit when Git Data operations are available; otherwise update files sequentially on the temporary branch.
-7. Open a PR into the base branch.
-8. Re-check mergeability and relevant conflicts.
-9. If validation passes and the PR is mergeable, automatically squash-merge it.
-10. After merge succeeds, delete the temporary head branch and verify it no longer exists.
-11. Release the write lock.
-12. Only then checkpoint project progress.
+Before creating a temporary branch, confirm at least one cleanup path exists:
 
-Risky rename, move, delete or attachment operations may need stricter validation, but they still use this same PR lifecycle.
+- the current GitHub capability can explicitly delete the head branch/ref; or
+- repository setting `delete_branch_on_merge` is enabled.
+
+If neither exists, do not create another branch. Report a configuration blocker first. This prevents accumulated merged branches.
+
+## PR transaction
+
+1. Resolve latest base head.
+2. Create a unique temporary branch from that exact commit.
+3. Read targets from a consistent base snapshot when possible.
+4. Produce complete final contents in memory.
+5. Run preservation/link/path checks.
+6. Prefer one atomic commit for the whole batch.
+7. Open PR into base branch.
+8. Re-check mergeability and conflicts.
+9. If validation passes and PR is mergeable, automatically squash-merge.
+10. Delete the temporary branch after merge and confirm it no longer exists.
+11. Update private project progress only after successful merge + cleanup.
+12. Release the write lock on success or handled failure.
+
+Risky rename/move/delete/attachment changes require explicit permission before preparing the mutation. Once authorized and validated, they use the same automatic merge and cleanup transaction.
 
 ## Atomic batch commit
 
 When Git Data operations are available:
 
-1. Build one final change set.
-2. Create blobs for changed text files.
-3. Create one tree using the current base tree.
-4. Create one commit with the expected parent.
-5. Move the temporary branch ref once.
+1. create blobs for all final text contents;
+2. create one tree from the current base tree;
+3. create one commit with the expected parent;
+4. move the temporary branch ref once.
 
-This reduces commit noise, stale-SHA races and partial updates.
-
-If unavailable, fall back to sequential writes on the temporary branch:
-- fetch each path immediately before updating it;
-- use the fresh blob SHA;
-- write each path at most once per logical batch;
-- never write the same path concurrently.
-
-## Automatic merge and branch cleanup
-
-After opening a PR:
-
-- do not wait for another conversation to finish ordinary validated work;
-- if the PR is mergeable and validation passes, squash-merge automatically;
-- after merge, delete the head branch automatically;
-- verify branch deletion before marking cleanup complete;
-- never intentionally leave merged temporary branches;
-- if the available GitHub capability cannot delete the branch, report cleanup as incomplete and never reuse that branch.
-
-Project progress is not marked completed before merge. After cleanup, record the PR and merge commit and clear the temporary branch field in private project state.
-
-## Conflict and retry limits
-
-### Stale SHA or content changed
-1. Refresh latest remote content.
-2. Re-apply the intended transformation.
-3. Retry once.
-4. On second failure, stop that path or batch and report the blocker.
-
-### Temporary branch ref moved unexpectedly
-- do not force-update;
-- create one fresh branch from the intended base and rebuild once;
-- on a second failure, stop.
-
-### Base branch changed during work
-Before merge, check PR mergeability. Never force-merge a conflict. If a clean automatic update is unavailable, keep the PR unmerged and report the blocking paths.
-
-### Permission/authentication failure
-Stop immediately; do not retry without a real authorization change.
-
-### Branch-name collision
-Generate one alternate suffix only. If it also collides, stop.
-
-### Unchanged content
-Skip it; do not create empty commits or no-op PRs.
+If unavailable, update files sequentially on the temporary branch using fresh SHAs; never write the same path concurrently or more than once per logical batch.
 
 ## Batch size
 
-Treat the configured batch maximum as a safety ceiling, not a target. Prefer coherent project/workstream batches; do not start with a whole-vault rewrite.
+Default safety ceiling: 10 changed files. Split larger work into coherent project/topic batches. Do not begin with a whole-Vault rewrite.
 
-## Commit and PR naming
+## Conflict/retry policy
 
-Use concise generic messages that describe the operation without leaking private note names when avoidable, for example:
+- stale SHA/ref: refresh and rebuild once; second failure stops the batch;
+- branch collision: generate one new suffix; second collision stops;
+- base changed: re-check PR mergeability; never force-merge conflict;
+- missing path: create only when note creation is allowed;
+- permission/auth failure: stop immediately;
+- unchanged content: no commit/no PR;
+- merged but branch not cleaned: report transaction incomplete and never reuse that branch.
+
+## Commit/PR conventions
+
+Use generic operation descriptions and avoid private note titles when possible:
 
 ```text
-docs(obsidian): curate project note batch
-docs(obsidian): normalize metadata and links
+docs(obsidian): curate project notes
+docs(obsidian): normalize note metadata batch
+docs(obsidian): refresh validated vault links
 ```
-
-PR titles should describe the logical batch, not enumerate private filenames.
 
 ## Read strategy
 
-- Exact path: fetch it directly.
-- Note title without path: search only in the bound Vault first.
-- Multiple matches: resolve with project state, folder context or links; do not guess.
-- Never broaden to unrelated repositories unless explicitly asked.
+- exact path: fetch directly;
+- title without path: search inside configured Vault only;
+- multiple matches: resolve from project/folder/link context, do not guess;
+- do not broaden to unrelated repositories without explicit request.
 
 ## Attachments
 
-Preserve existing attachment targets. Do not rename/move binary attachments by default or write binary data through text-only operations. Attachment migration is a PR-based high-risk workflow.
+Text-first by default. Preserve embed targets. Do not rename/move binary attachments unless the user explicitly authorized a risky migration.
