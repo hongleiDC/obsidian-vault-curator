@@ -1,397 +1,157 @@
-# Adaptive note methodology and Vault architecture
+# Adaptive note methodology and namespace organization
 
-Use this reference when the user asks how their current notes should be organized, wants a better note-taking method, or asks the Skill to infer a suitable structure from the existing Vault.
+Use this reference when diagnosing a Vault, selecting a note method, or deciding where a note should live.
 
-## Contents
+## 1. Diagnose before redesign
 
-1. Core principle
-2. Diagnosis workflow
-3. What to measure
-4. Note archetypes
-5. Method selection
-6. Hybrid architecture
-7. Pilot before migration
-8. Persistent methodology profile
-9. Re-analysis and drift
-10. Anti-patterns
+Do not impose a fashionable framework first. Observe the existing Vault and answer:
 
-## 1. Core principle
+- What directory depths and naming patterns already recur?
+- Which Frontmatter keys/tags/links/tasks are stable?
+- Which notes are capture, source, log, project, concept, decision, how-to, reference, or hub/MOC?
+- Where are source material and personal synthesis mixed?
+- Which project logs contain conclusions that should be promoted?
+- Are folders, tags, Properties and links redundantly encoding the same taxonomy?
 
-Do not force a fashionable system such as PARA or Zettelkasten onto every Vault.
+Use aggregate analysis whenever possible. Avoid copying private note bodies into reports.
 
-The correct sequence is:
+## 2. Functional note types
+
+Prefer a hybrid system. Typical contracts:
+
+- **Capture**: fast intake; minimal formatting; process later.
+- **Source**: preserve external evidence and citation; keep synthesis separate.
+- **Log / Daily / Experiment**: preserve chronology, attempts, observations and outcomes.
+- **Project**: current objective, status, next actions, decisions and blockers.
+- **Concept / Evergreen**: independently reusable understanding; split only when reuse is real.
+- **Decision**: context, options, choice, rationale, consequences.
+- **How-to / Troubleshooting**: goal/symptom, evidence, steps, validation, failure modes.
+- **Reference**: quick lookup; tables/lists often beat long prose.
+- **MOC / Hub**: curated navigation across a mature cluster, not a backlink dump.
+
+Do not force every type into the same template.
+
+## 3. Separate organization mechanisms
+
+Give each mechanism one main job:
+
+- folders: coarse physical placement;
+- Properties: stable structured metadata;
+- tags: cross-cutting workflow/state/topic categories;
+- wikilinks: semantic relations between concrete notes;
+- MOCs: curated navigation and synthesis.
+
+Avoid encoding the same hierarchy in all five.
+
+## 4. Namespace-first shallow hierarchy
+
+Preserve the user's established namespace grammar. Default maximum directory depth: **3 folders relative to the Vault root**.
+
+Generic pattern:
 
 ```text
-observe existing data
-      ↓
-identify recurring note shapes and workflows
-      ↓
-separate capture, source, thinking, action and navigation needs
-      ↓
-choose the smallest useful set of note types
-      ↓
-pilot on a small sample
-      ↓
-persist the accepted method privately
-      ↓
-use it consistently in later curation
+NB.<AREA>/<PREFIX>.<PROJECT>/<Note>.md
 ```
 
-Prefer a hybrid system when the Vault contains several materially different kinds of notes.
-
-## 2. Diagnosis workflow
-
-### Phase A: inventory
-
-Inspect the Vault without rewriting it.
-
-Collect structural evidence such as:
-
-- number and length distribution of Markdown files;
-- folder depth and whether folders carry stable meaning;
-- filename conventions and date-based notes;
-- common Frontmatter keys;
-- tags and aliases usage;
-- wikilink and embed density;
-- task density;
-- callouts, code, formulas, Dataview fields and tables;
-- source / URL / citation metadata;
-- ratio of short fragmented notes to long synthesis notes;
-- repeated note shapes across the Vault.
-
-When a local/materialized Vault is available, run:
-
-```bash
-python scripts/analyze_vault_patterns.py <vault-root> --output <private-report.json>
-```
-
-The default report is aggregate-only and does not emit note titles, paths or text excerpts.
-
-For a GitHub-only Vault, reproduce the same evidence from repository metadata plus a stratified sample. Do not download or echo the entire Vault merely to classify it.
-
-### Phase B: identify friction
-
-Look for operational problems, not only formatting inconsistencies:
-
-- one note mixes capture, source quotations, personal conclusions and tasks;
-- many notes are long but have no stable navigation layer;
-- many tiny notes exist but rarely link to each other;
-- project logs are being mistaken for permanent knowledge;
-- source notes and the user's own synthesis are mixed without boundaries;
-- daily notes contain valuable conclusions that never get promoted;
-- folders, tags and links all attempt to represent the same taxonomy;
-- MOCs are absent where the Vault has grown too large for direct search;
-- duplicated metadata exists without being used by queries or workflows.
-
-### Phase C: recommend a method
-
-Recommend the smallest set of note types that solves the observed friction. Explain why each type is needed and which existing notes should map to it.
-
-Do not propose a full Vault migration immediately.
-
-## 3. What to measure
-
-The deterministic analyzer produces evidence, not truth. Interpret signals conservatively.
-
-Useful high-level signals:
-
-| Signal | Likely need |
-| --- | --- |
-| many date-named notes | chronological log / daily workflow |
-| many tasks + status fields | project/action notes |
-| source/url fields + external links | source/reference notes |
-| short notes + moderate wikilinks | atomic/evergreen concept notes |
-| high wikilink + list density | MOC / hub notes |
-| code blocks + procedural headings | technical how-to / troubleshooting notes |
-| many tables, compact prose | structured reference notes |
-| very long notes + many headings | synthesis / chapter-like notes |
-| several strong signals at once | hybrid system, not one universal template |
-
-Do not infer subject matter, identity or profession from structural metrics alone.
-
-## 4. Note archetypes
-
-Use these as functional contracts, not rigid templates.
-
-### A. Capture / Inbox
-
-Purpose: record quickly before classification.
-
-Characteristics:
-- minimal formatting;
-- temporary status;
-- should eventually be processed, linked, promoted or archived.
-
-Do not beautify capture notes so heavily that capture becomes slow.
-
-### B. Atomic / Evergreen concept
-
-Purpose: preserve one reusable idea that can stand on its own.
-
-Good for:
-- definitions;
-- mechanisms;
-- principles;
-- reusable explanations;
-- conclusions that are expected to remain useful beyond one project.
-
-Typical structure:
-
-```markdown
-# Concept
-
-One-sentence core idea.
-
-## Explanation
-...
-
-## Relationships
-Natural wikilinks in context.
-```
-
-Do not split notes into atoms merely because they are long. Split only when the resulting notes have independent reuse value.
-
-### C. Source / Literature / Reference
-
-Purpose: keep what an external source says distinct from the user's synthesis.
-
-Suggested separation:
-- bibliographic/source metadata;
-- factual notes or quotations;
-- user's annotations clearly marked;
-- links to synthesis/evergreen notes where conclusions are developed.
-
-A source note should not automatically become the final knowledge note.
-
-### D. Project / Outcome note
-
-Purpose: coordinate active work toward an outcome.
-
-Typical content:
-- goal / scope;
-- current state;
-- next actions;
-- decisions;
-- links to supporting knowledge;
-- results or deliverables.
-
-Do not convert project status into permanent knowledge until it becomes reusable.
-
-### E. Log / Daily / Experiment journal
-
-Purpose: preserve chronology and evidence.
-
-Typical content:
-- timestamp/date;
-- what happened;
-- observations;
-- decisions;
-- next step.
-
-Logs are append-oriented. Do not repeatedly rewrite history to make them look like evergreen notes. Promote important conclusions out of the log instead.
-
-### F. Decision record
-
-Purpose: preserve why a consequential choice was made.
-
-Suggested fields:
-- context;
-- options;
-- decision;
-- rationale;
-- consequences;
-- revisit condition.
-
-Useful when the same decision would otherwise be re-litigated later.
-
-### G. Technical how-to / Troubleshooting
-
-Purpose: make a procedure reproducible.
-
-Suggested structure:
-- symptom / goal;
-- environment or prerequisites only when relevant;
-- checks / evidence;
-- procedure;
-- verification;
-- known failure modes.
-
-Protect commands and code verbatim.
-
-### H. MOC / Hub
-
-Purpose: provide curated navigation over a topic, project or domain.
-
-A hub should organize and explain relationships. It is not merely a dump of every backlink.
-
-Use MOCs when direct search and backlinks are no longer enough, not because every topic needs one.
-
-### I. Structured reference
-
-Purpose: fast lookup of stable facts, commands, parameters or comparisons.
-
-Prefer tables, lists or compact sections. Avoid turning reference material into unnecessary prose.
-
-## 5. Method selection
-
-Select a system based on dominant workflows:
-
-### Mostly learning / conceptual knowledge
-
-Use:
-- source notes;
-- atomic/evergreen concepts;
-- synthesis notes;
-- topic MOCs when clusters grow.
-
-This is Zettelkasten-like only where atomicity and linking create real reuse value.
-
-### Mostly projects and active work
-
-Use:
-- project/outcome notes;
-- logs;
-- decision records;
-- supporting reference/knowledge notes.
-
-A PARA-like folder layer may help for lifecycle management, but do not use folders as the only knowledge relation.
-
-### Mostly research / source-heavy work
-
-Use:
-- source/literature notes;
-- experiment/log notes;
-- synthesis/claim notes;
-- MOCs or research hubs;
-- explicit separation between evidence and interpretation.
-
-### Mostly operational / technical notes
-
-Use:
-- how-to/troubleshooting notes;
-- structured references;
-- decision records;
-- project notes for active implementation;
-- hubs for system-level navigation.
-
-### Mixed Vault
-
-Default to a note-type-based hybrid. Do not demand one universal template.
-
-## 6. Hybrid architecture
-
-A useful default architecture is functional rather than topic-specific:
+Optional one-level project-internal grouping:
 
 ```text
-Capture  → temporary input
-Source   → what external material says
-Log      → what happened over time
-Project  → what is being done now
-Concept  → reusable understanding
-Decision → why a choice was made
-Reference→ fast lookup
-MOC      → navigation and synthesis
+NB.<AREA>/<PREFIX>.<PROJECT>/<GROUP>/<Note>.md
 ```
 
-Folders, tags, Properties and wikilinks should have distinct jobs:
+Rules:
 
-- **folders**: coarse storage/lifecycle boundaries when useful;
-- **Properties**: machine-queryable state/type/source metadata;
-- **tags**: broad cross-cutting categories or workflow state;
-- **wikilinks**: semantic relationships between concrete notes;
-- **MOCs**: curated navigation and explanation across a cluster.
+1. Level 1 is a stable high-level namespace such as `NB.<AREA>`.
+2. Level 2 is a concrete research/work/project unit named `<PREFIX>.<ProjectName>`.
+3. Multiple configured level-2 prefixes are peers by default; they identify project/research directions, not note types.
+4. Never infer semantics from prefix spelling. A token that looks like `NAV` is not automatically a navigation note, MOC or Hub.
+5. Prefix meaning must come from private methodology state.
+6. Level 3 is optional and only for a genuinely useful project-internal group/stage/workstream.
+7. Do not create a fourth folder level. Use Properties, tags, wikilinks or MOC for cross-cutting structure.
+8. Preserve established spelling exactly; do not "correct" a user's namespace name.
+9. Flattening an existing deep tree is a migration, not formatting. Move in coherent PR batches and verify backlinks/embeds.
 
-Avoid using all four to encode the same taxonomy.
+## 5. Persist naming semantics privately
 
-## 7. Pilot before migration
+The public Skill should support arbitrary namespace/prefix schemes. Actual user roots, prefixes, meanings and project names belong in private `methods/note-system.json`.
 
-Before changing a large Vault:
-
-1. choose 5–15 representative notes from the relevant scope;
-2. map each to a proposed note type;
-3. curate them with the proposed contracts;
-4. evaluate retrieval, readability, linking and maintenance cost;
-5. adjust the method;
-6. only then apply to a larger batch.
-
-Never redesign hundreds of notes based only on one attractive template.
-
-## 8. Persistent methodology profile
-
-Once a method is accepted, persist only the method and structural preferences in the external private state directory:
-
-```text
-<state-root>/methods/note-system.json
-```
-
-Use:
-
-```bash
-python scripts/state_store.py method-write --file <methodology.json>
-python scripts/state_store.py method-read
-python scripts/state_store.py method-status
-```
-
-Recommended private schema:
+Recommended private structure:
 
 ```json
 {
   "schema_version": 1,
   "strategy": {
-    "name": "hybrid-note-types",
-    "principles": [
-      "separate source from synthesis",
-      "preserve logs chronologically",
-      "promote reusable conclusions to concept notes"
-    ]
+    "name": "hybrid-project-notes"
+  },
+  "organization": {
+    "max_folder_depth": 3,
+    "namespace_roots": ["NB.<AREA>"],
+    "project_unit_pattern": "<PREFIX>.<ProjectName>",
+    "project_prefixes": {
+      "PX": "example domain A",
+      "QX": "example domain B"
+    },
+    "third_level_policy": "optional-project-internal-group-only"
   },
   "note_types": [
-    {
-      "name": "concept",
-      "purpose": "reusable understanding",
-      "preferred_sections": ["core idea", "explanation", "relationships"]
-    }
-  ],
-  "organization": {
-    "folders_role": "coarse lifecycle only",
-    "tags_role": "cross-cutting state/categories",
-    "links_role": "semantic relationships",
-    "moc_role": "curated navigation"
-  },
-  "curation_rules": {
-    "split_long_notes_only_when_independently_reusable": true,
-    "preserve_log_chronology": true
-  }
+    {"name": "project", "purpose": "current outcome and progress"},
+    {"name": "concept", "purpose": "reusable understanding"},
+    {"name": "source", "purpose": "external evidence"},
+    {"name": "log", "purpose": "chronological work record"}
+  ]
 }
 ```
 
-Do not store raw note bodies, copied excerpts, credentials or repository identifiers in the methodology file.
+Use fictional prefix values in public docs/tests. Real user mappings remain private.
 
-At the start of future curation tasks, load the methodology profile after the Vault binding. Use it as the default organization policy unless the current note clearly belongs to a different functional type.
+## 6. Project progress and note placement
 
-## 9. Re-analysis and drift
+A continuing project state normally maps to the level-2 project unit, regardless of prefix. The prefix is part of project identity but not a note type.
 
-Do not re-analyze the whole Vault every time.
+When curating a note:
 
-Re-run diagnosis when:
-- the user asks to redesign the note system;
-- the methodology file is absent;
-- the Vault changed substantially;
-- repeated notes do not fit the current types;
-- the user says the current method feels cumbersome;
+1. resolve the active project state;
+2. load private namespace/prefix mapping;
+3. determine the note's functional type;
+4. place it within that project's existing shallow structure;
+5. create the optional third level only if several notes truly need that grouping;
+6. prefer metadata/links over deeper folders.
+
+## 7. Pilot before migration
+
+Before a large restructure:
+
+1. choose 5–15 representative notes;
+2. map them to proposed functional types;
+3. curate them using the proposed namespace/project structure;
+4. evaluate retrieval, readability, linking and maintenance cost;
+5. adjust the method;
+6. only then apply to larger batches.
+
+Never redesign hundreds of notes from one attractive template.
+
+## 8. Persistence and drift
+
+Persist an accepted method with `scripts/state_store.py method-write`. Future tasks load it instead of redesigning every time.
+
+Re-run diagnosis only when:
+
+- the user asks to redesign;
+- methodology is missing;
+- the Vault changes substantially;
+- repeated notes no longer fit the current contracts;
+- the current method causes friction;
 - a new major workflow appears.
 
-Otherwise apply the existing private methodology profile.
-
-## 10. Anti-patterns
+## 9. Anti-patterns
 
 Do not:
-- force every note into the same section template;
-- equate short notes with good atomic notes;
-- split source material into dozens of artificial atoms;
-- turn daily logs into polished evergreen prose;
+
+- interpret a project prefix as a note type from its spelling;
+- create a navigation/MOC note merely because a prefix resembles `NAV`;
+- create deep folder trees for every subtopic;
+- force all research projects into one content template;
+- turn logs into polished evergreen prose;
+- split sources into artificial atoms;
 - create MOCs for tiny clusters;
-- create tags and wikilinks for every noun;
-- migrate the entire Vault before testing the method;
-- infer a user's profession or identity from note structure;
-- persist private content in public Skill source or examples.
+- copy real user project names into public Skill examples or fixtures.

@@ -1,27 +1,22 @@
 # Private persistent state
 
-Use this reference whenever the Skill needs to remember a GitHub-backed Vault across conversations.
+Use this reference whenever the Skill needs to remember a GitHub-backed Vault, accepted note methodology, or project progress across conversations.
 
 ## Privacy boundary
 
 User-specific state must live outside both the Skill source tree and the user's Vault repository. Never package, commit, publish, or copy private state into the Skill repository.
 
-The state must not contain authentication secrets. GitHub authentication stays with the connector; do not store tokens, cookies, PATs, passwords, or SSH private keys.
+Never store authentication secrets. GitHub authentication stays with the connector; do not store tokens, cookies, PATs, passwords, or SSH private keys.
 
 ## State root
 
-Resolve the private state root in this order:
-
+Resolve in this order:
 1. `OBSIDIAN_CURATOR_STATE_DIR` when set.
 2. Otherwise `~/.obsidian-vault-curator/`.
 
-Reject the state location when it is inside:
+Reject a state location inside the Skill source tree, installed Skill package, or configured Vault repository working tree.
 
-- the Skill source directory;
-- the installed Skill package directory;
-- the configured Vault repository working tree.
-
-If the environment has no persistent writable filesystem, do not fall back to embedding the profile in `SKILL.md`, an asset, a ZIP, a public repository, or a note. Use session-only binding or a user-provided private persistent path.
+If the environment has no persistent writable filesystem, do not fall back to embedding private state in `SKILL.md`, a ZIP, public repository, or note. Use session-only binding or a user-provided private persistent location and clearly state the limitation.
 
 ## Directory layout
 
@@ -29,66 +24,95 @@ If the environment has no persistent writable filesystem, do not fall back to em
 <state-root>/
 ├── profiles/
 │   └── default.json
+├── methods/
+│   └── note-system.json
+├── projects/
+│   ├── index.json
+│   └── <project-id>.json
 ├── runtime/
 │   └── last-success.json
 ├── cache/
 │   ├── vault-index.json
 │   └── vault-patterns.json
-├── methods/
-│   └── note-system.json
 └── locks/
     └── github-write.lock
 ```
 
 ### profiles/default.json
 
-Store only operational binding and preferences:
-
-- schema version;
-- Vault repository identifier;
-- base branch;
-- optional Vault root relative to repository root;
-- write policy;
-- safety flags.
-
-Do not store note bodies, copied attachments, access tokens, passwords, email addresses, or unrelated user profile information.
-
-### runtime/last-success.json
-
-May store minimal recovery metadata such as:
-
-- last successful base ref or commit SHA;
-- last successful write timestamp;
-- last temporary branch or PR identifier when needed for recovery.
-
-Do not store note content.
-
-### cache/vault-index.json
-
-Derived cache only. It may contain note names, paths, headings, block IDs, and link targets, so treat it as private. It must be safe to delete and rebuild.
+Store only operational Vault binding and preferences: schema version, repository identifier, base branch, optional Vault root, batch size and safety flags. A legacy `allow_direct_write` value, if present in an older profile, must be ignored: current Skill policy is PR-only.
 
 ### methods/note-system.json
 
-Store the accepted note methodology and structural preferences here. It may include note-type contracts, folder/tag/link roles, curation rules and a small aggregate analysis summary.
+Store the accepted note methodology and structural preferences. It may include note-type contracts, folder/tag/link roles, shallow directory policy, curation rules, and a small aggregate analysis summary. Do not store raw note bodies, credentials or unnecessary personal profile data.
 
-Do not store raw note bodies, copied excerpts, repository identifiers, credentials or unnecessary personal profile information in this file.
+### projects/index.json
+
+Store the active project ID and a lightweight catalog of known project IDs/names/aliases. This is the starting point for cross-conversation recovery.
+
+### projects/<project-id>.json
+
+Store only operational context needed to continue work:
+- project name and aliases;
+- status and phase;
+- current focus;
+- concise completed work;
+- ordered next actions;
+- blockers;
+- important decisions;
+- relevant private note paths/folders when useful;
+- latest successful PR number, merge commit and temporary branch state.
+
+Do not copy entire note bodies or long chat transcripts into project state.
+
+Use `scripts/project_state.py` for project state operations.
+
+### runtime/last-success.json
+
+May store minimal recovery metadata such as last successful base ref or write timestamp. It is not a substitute for project progress files.
+
+### cache/*
+
+Derived private cache only. It may contain note paths/headings/link targets, so never publish it. It must be safe to delete and rebuild.
 
 ### locks/github-write.lock
 
-Use a lock during a GitHub write transaction when the execution environment supports it. This reduces overlapping runs that try to modify the same Vault simultaneously.
+Use a write lock during GitHub mutations when supported. Reclaim stale locks only after a reasonable timeout and never spin indefinitely waiting for one.
 
-A stale lock may be reclaimed only after a reasonable timeout and only when there is no active task associated with it. Do not spin indefinitely waiting for a lock.
+## One-time binding
 
-## State helper
+When no profile exists:
+1. Ask only for the missing Vault repository identifier.
+2. Resolve the default branch through GitHub when possible.
+3. Ask for a Vault subdirectory only when needed.
+4. Persist the binding externally.
+5. Validate access before reporting it ready.
 
-Use `scripts/state_store.py` for deterministic state handling when code execution is available.
+Do not ask for the repository again while the private profile remains readable and valid.
 
-Typical operations:
+## Project recovery
+
+At the start of every GitHub-backed project task:
+1. load the Vault profile;
+2. load `projects/index.json`;
+3. resolve the project by explicit name, alias, active project, or unambiguous top-level project folder;
+4. load that project's JSON state;
+5. combine project progress with the accepted note methodology and current remote files.
+
+Do not ask the user to repeat progress already persisted in project state.
+
+## Checkpoint timing
+
+Checkpoint project progress only after the GitHub outcome is known:
+- PR merged and branch cleanup succeeded → add completed work, refresh focus/next actions/blockers, record PR and merge commit, clear branch field;
+- validation or merge failed → do not mark completed; record blocker and next action instead.
+
+## State helpers
+
+Vault binding and methodology:
 
 ```bash
 python scripts/state_store.py init --repository <value>
-python scripts/state_store.py read
-python scripts/state_store.py set --branch <value>
 python scripts/state_store.py status
 python scripts/state_store.py method-status
 python scripts/state_store.py method-read
@@ -97,37 +121,19 @@ python scripts/state_store.py lock-acquire
 python scripts/state_store.py lock-release
 ```
 
-`init` and `set` write atomically. The helper attempts private filesystem permissions where supported.
+Project progress:
 
-`status` is safe for user-visible diagnostics: it reports whether a profile exists and where the state root is, but redacts the repository identifier by default.
+```bash
+python scripts/project_state.py init --id example --name "Example Project"
+python scripts/project_state.py list
+python scripts/project_state.py use --id example
+python scripts/project_state.py status
+python scripts/project_state.py read
+python scripts/project_state.py update --focus "Current task" --next-action "Next task"
+```
 
-## One-time binding
-
-When no profile exists:
-
-1. Ask only for the missing Vault repository identifier.
-2. Resolve the repository's default branch through GitHub when possible instead of asking for it.
-3. Ask for a Vault subdirectory only if repository inspection shows that the Vault is not at the repository root or the user says so.
-4. Persist the binding in the external state directory.
-5. Validate access before reporting the binding as ready.
-
-Do not ask for the repository again on later tasks while the private profile is readable and valid.
-
-## Updating the binding
-
-When the user switches Vault repositories or branches:
-
-- update the external profile, not the Skill repository;
-- validate the new target before replacing a working binding when possible;
-- never include the old or new private identifier in public changelogs, examples, test fixtures, screenshots, or commits.
+All state writes should be atomic and use private filesystem permissions where supported.
 
 ## Logging and diagnostics
 
-- Keep logs minimal and disabled by default.
-- Redact repository identifiers in user-visible diagnostics unless the user explicitly asks to see them.
-- Never log credentials.
-- Prefer error categories such as `repository unavailable`, `branch unavailable`, or `write conflict` over dumping connector payloads containing private metadata.
-
-## Methodology persistence
-
-After a Vault diagnosis and small pilot, persist the accepted method with `method-write`. Future curation tasks should load it with `method-read` instead of re-designing the note system every time. Re-analyze only when the user asks, the method is missing, or the Vault structure has materially drifted.
+Keep logs minimal and disabled by default. Redact repository identifiers unless the user explicitly requests them. Prefer categories such as `repository unavailable`, `branch unavailable`, `write conflict`, or `project state unavailable` over dumping connector payloads.
