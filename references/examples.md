@@ -127,3 +127,18 @@ Pilot the method on a small representative set before changing the rest of the V
 Fictional user request: “Move the test notes into the new project and clean them up.”
 
 If the Vault contains two candidate projects or two candidate test-note groups, do not choose one. First inspect private project state and the current Vault. If ambiguity remains, ask one short round such as which project and which note group are intended. Only after those answers remove all material ambiguity should the Skill edit files or open a PR.
+
+
+## Example: create a checklist before mutation
+
+Fictional user request: “Clean up the notes in `PX.SampleProject`.”
+
+After the clarification gate establishes that only this fictional project is in scope, first inspect that project read-only and surface a concise checklist such as:
+
+```text
+C001 [high] Fix two broken internal links
+C002 [medium] Normalize inconsistent project Properties
+C003 [low] Verify the project index after C001 and C002
+```
+
+Persist the checklist in private project state. Work through it item by item. Do not scan or modify neighboring projects merely because another issue is noticed. If a new in-scope problem is discovered, append it; if it is out of scope, record it for later instead of silently expanding the task.

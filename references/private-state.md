@@ -61,7 +61,8 @@ Store only operational context needed to continue work:
 - blockers;
 - important decisions;
 - relevant private note paths/folders when useful;
-- latest successful PR number, merge commit and temporary branch state.
+- latest successful PR number, merge commit and temporary branch state;
+- one compact `modification_checklist` containing only the confirmed task scope, short actionable items, status, priority, dependencies and brief verification/blocker notes.
 
 Do not copy entire note bodies or long chat transcripts into project state.
 
@@ -97,14 +98,15 @@ At the start of every GitHub-backed project task:
 2. load `projects/index.json`;
 3. resolve the project by explicit name, alias, active project, or unambiguous top-level project folder;
 4. load that project's JSON state;
-5. combine project progress with the accepted note methodology and current remote files.
+5. combine project progress with the accepted note methodology and current remote files;
+6. resume an unfinished `modification_checklist` when it matches the current confirmed scope; otherwise create a new checklist only after intent is execution-ready.
 
 Do not ask the user to repeat progress already persisted in project state.
 
 ## Checkpoint timing
 
 Checkpoint project progress only after the GitHub outcome is known:
-- PR merged and branch cleanup succeeded → add completed work, refresh focus/next actions/blockers, record PR and merge commit, clear branch field;
+- PR merged and branch cleanup succeeded → mark the represented checklist items done; when the full checklist is complete, add completed work, refresh focus/next actions/blockers, record PR and merge commit, clear branch field;
 - validation or merge failed → do not mark completed; record blocker and next action instead.
 
 ## State helpers
