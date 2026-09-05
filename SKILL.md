@@ -1,15 +1,15 @@
 ---
 name: obsidian-vault-curator
-description: 分析、设计、整理和维护 Obsidian Markdown 笔记与 Vault，尤其适用于长期保存在 GitHub 仓库中的知识库。用于从仓库外私有状态恢复 Vault 绑定、当前项目进度与已采用的笔记方法；先分析现有数据形态，再按用户已有命名体系、项目结构和混合笔记方法整理；当用户指令存在会改变结果的实质性歧义时必须先进入多轮澄清，直到达到 execution-ready 才开始修改；支持单篇/多篇重构、Properties、wikilinks、项目进度 checkpoint 与 GitHub PR-only 安全写回。所有 GitHub 修改必须通过 PR，验证后自动 squash merge，并在合并后清理临时分支。必须保护原始语义与隐私，不把用户仓库地址、私有路径、令牌、真实项目清单或笔记正文写入 Skill 源码仓库或 Skill 包。
+description: 分析、设计、整理和维护 Obsidian Markdown 笔记与 Vault，尤其适用于长期保存在 GitHub 仓库中的知识库。用于从仓库外私有状态恢复 Vault 绑定、当前项目进度与已采用的笔记方法；先分析现有数据形态，再按用户已有命名体系、项目结构和混合笔记方法整理；当用户指令存在会改变结果的实质性歧义时必须先进入多轮澄清，达到 execution-ready 后先建立范围受控、可跨对话恢复的修改清单，再逐项执行和验证；支持单篇/多篇重构、Properties、wikilinks、项目进度 checkpoint 与 GitHub PR-only 安全写回。所有 GitHub 修改必须通过 PR，验证后自动 squash merge，并在合并后清理临时分支。必须保护原始语义与隐私，不把用户仓库地址、私有路径、令牌、真实项目清单或笔记正文写入 Skill 源码仓库或 Skill 包。
 ---
 
 # Obsidian Vault Curator
 
-把已有内容整理成可检索、可关联、可持续维护的 Obsidian 知识库。不要把它当成单纯 Markdown 美化器：先恢复项目上下文和用户方法，再整理当前内容。
+把已有内容整理成可检索、可关联、可持续维护的 Obsidian 知识库。不要把它当成单纯 Markdown 美化器：先恢��项目上下文和用户方法，再整理当前内容。
 
 按需读取：
 - `references/private-state.md`：私有持久化状态、绑定、权限和隐私。
-- `references/project-progress.md`：跨对话项目进度恢复、未完成澄清与 checkpoint。
+- `references/project-progress.md`：跨对话项目进度、未完成澄清、修改清单与 checkpoint。
 - `references/intent-clarification.md`：指令歧义检测、多轮提问、execution-ready 判定。
 - `references/github-backend.md`：PR-only、自动合并、分支清理、冲突与重试。
 - `references/note-methodology.md`：Vault 诊断、笔记类型、用户命名体系、浅层目录与长期方法。
@@ -51,7 +51,8 @@ description: 分析、设计、整理和维护 Obsidian Markdown 笔记与 Vault
 5. 用 GitHub connector 重新确认仓库、分支和当前远端文件；不要复用旧聊天中的正文或 SHA。
 6. 在任何写入前检查 PR 分支清理能力：当前 GitHub 工具可以删除分支，或仓库已启用 `delete_branch_on_merge`。两者都没有时停止写入，避免制造垃圾分支。
 7. 运行意图澄清门：把本轮指令与私有项目状态、方法状态和当前远端内容对照；若存在会改变项目、文件、范围、含义、目录、写回或破坏性操作的实质性歧义，停止执行并先向用户提问。
-8. 只有达到 `execution-ready` 后，才完成只读分析、保护检查和完整修改方案并进入 PR 事务。
+8. 只有达到 `execution-ready` 后，才做本次请求范围内的只读诊断并建立或恢复 `modification_checklist`；先向用户展示清单，再开始任何 mutation。
+9. 按清单依赖和优先级逐项执行、验证、更新状态；GitHub mutation 最终进入 PR 事务。
 
 如果私有状态不存在，只询问真正缺失的绑定/项目/方法信息，并写入私有状态；以后不要重复询问。
 
@@ -89,9 +90,27 @@ description: 分析、设计、整理和维护 Obsidian Markdown 笔记与 Vault
 - 影响后续整理的 decisions；
 - 必要 working_set；
 - 最近成功 PR、merge commit 和临时分支状态；
-- 当前意图状态：紧凑理解摘要、尚未解决的问题和最后确认时间。
+- 当前意图状态：紧凑理解摘要、尚未解决的问题和最后确认时间；
+- 当前 `modification_checklist`：任务范围、逐项状态、优先级、依赖和必要的简短验证备注。
 
 开始任务前必须读取项目状态；PR 成功合并并完成分支清理后才 checkpoint。失败时不要把任务记为 completed，而是更新 blocker 和 next action。
+
+## 修改清单驱动执行
+
+只要任务会修改 Vault，就在意图达到 `execution-ready` 后、第一次 mutation 前建立修改清单。即使只有一个改动，也允许使用单项清单；不要边发现边随意修改。
+
+规则：
+
+1. **清单范围等于用户本轮确认的任务范围。** 用户指定某个项目就只诊断该项目；只有用户要求更大范围时才扩大扫描。
+2. **先恢复再新建。** 当前项目存在未完成清单且范围与本轮任务一致时直接续做，不重复诊断生成另一份清单。若范围明显不同，不得覆盖旧清单；先通过澄清门确认切换范围，必要时才 `--force` 建立新清单。
+3. **清单项必须可执行、可验证。** 每项保存短文本、`pending / in_progress / blocked / done` 状态、`high / medium / low` 优先级和必要依赖，不保存长篇方案或笔记正文。
+4. **先展示，再继续。** 生成清单后用简短进度更新向用户展示问题和处理顺序；除非涉及原本就需要授权的高风险操作，不再额外要求形式化确认。
+5. **逐项推进。** 开始处理前标记 `in_progress`；验证失败则标记 `blocked` 并写一条短原因；只有满足验收条件才可 `done`。依赖未完成时不得把后续项标记完成。
+6. **GitHub 完成条件更严格。** 涉及远端修改的清单项只有在包含该修改的 PR 成功 merge 且临时分支清理完成后才标记 `done`。紧密耦合的多个清单项可以进入同一小批次 PR。
+7. **新问题不能偷偷扩范围。** 执行中发现的新问题若明显属于当前确认范围，可追加到清单；若超出范围，记录到 `next_actions`，或在它会改变当前结果时向用户提问，不自动扩大任务。
+8. **跨对话恢复。** 下一次启动先读取清单：优先继续未完成且依赖已满足的项目，而不是重新从头规划。全部清单项完成后，清单整体状态才变为 `done`，再更新项目 checkpoint。
+
+使用 `scripts/project_state.py checklist-*` 管理清单；详细状态契约见 `references/project-progress.md`。
 
 ## 用户命名体系与浅目录硬规则
 
