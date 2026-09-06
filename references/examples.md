@@ -122,11 +122,13 @@ MOC         → curated navigation across mature clusters
 
 Pilot the method on a small representative set before changing the rest of the Vault. If the user accepts it, persist only the methodology in the external private state directory.
 
-## Example: ambiguous instruction must pause
+## Example: ambiguous or complex instruction must use three-question correction
 
-Fictional user request: “Move the test notes into the new project and clean them up.”
+Fictional user request: “Move the test notes into the new project, clean them up, repair links, and push the result.”
 
-If the Vault contains two candidate projects or two candidate test-note groups, do not choose one. First inspect private project state and the current Vault. If ambiguity remains, ask one short round such as which project and which note group are intended. Only after those answers remove all material ambiguity should the Skill edit files or open a PR.
+This is complex even before considering ambiguity. First inspect private project state and the current Vault, then ask exactly three questions. Each question must include the Skill's proposed answer, for example: target project, exact note scope, and preservation/write-back boundary.
+
+After the user answers, compare all three responses with the proposed answers and explicitly correct any mistaken assumptions. If the corrected interpretation is still materially ambiguous, ask another three-question round. Only after the correction review reaches `execution-ready` may the Skill diagnose changes, create the modification checklist, edit files, or open a PR.
 
 
 ## Example: create a checklist before mutation
