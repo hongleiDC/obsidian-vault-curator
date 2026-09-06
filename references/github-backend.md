@@ -31,12 +31,13 @@ If neither exists, do not create another branch. Report a configuration blocker 
 4. Produce complete final contents in memory.
 5. Run preservation/link/path checks.
 6. Prefer one atomic commit for the whole batch.
-7. Open PR into base branch.
-8. Re-check mergeability and conflicts.
-9. If validation passes and PR is mergeable, automatically squash-merge.
-10. Delete the temporary branch after merge and confirm it no longer exists.
-11. Update private project progress only after successful merge + cleanup.
-12. Release the write lock on success or handled failure.
+7. For changed text containing non-ASCII characters, read the committed files back from the temporary branch and verify remote blob identity/UTF-8 integrity before opening the PR. If the remote blob SHA differs from the expected local Git blob SHA, or the read-back contains obvious mojibake, stop and rebuild the write instead of merging corrupted text.
+8. Open PR into base branch.
+9. Re-check mergeability and conflicts.
+10. If validation passes and PR is mergeable, automatically squash-merge.
+11. Delete the temporary branch after merge and confirm it no longer exists.
+12. Update private project progress only after successful merge + cleanup.
+13. Release the write lock on success or handled failure.
 
 Risky rename/move/delete/attachment changes require explicit permission before preparing the mutation. Once authorized and validated, they use the same automatic merge and cleanup transaction.
 
@@ -50,6 +51,17 @@ When Git Data operations are available:
 4. move the temporary branch ref once.
 
 If unavailable, update files sequentially on the temporary branch using fresh SHAs; never write the same path concurrently or more than once per logical batch.
+
+## Encoding integrity guard
+
+Treat UTF-8 integrity as part of write validation, especially for Chinese or other non-ASCII Markdown/YAML text.
+
+- Keep source text UTF-8 without lossy transcoding.
+- When a local/materialized source is available, compute its expected Git blob SHA (equivalent to `git hash-object <file>`).
+- After the temporary-branch commit, fetch the changed file or branch tree from GitHub and compare the remote blob SHA with the expected blob SHA.
+- For non-ASCII files, also inspect a short read-back for replacement characters or obvious mojibake caused by UTF-8/legacy-encoding double decoding.
+- A blob mismatch is a failed validation even if the PR diff otherwise looks structurally correct. Never merge first and repair encoding later.
+- Do this check on the temporary branch before PR merge so corrupted text never reaches the base branch.
 
 ## Batch size
 
