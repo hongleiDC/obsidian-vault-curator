@@ -5,7 +5,7 @@ description: 分析、设计、整理和维护 Obsidian Markdown 笔记与 Vault
 
 # Obsidian Vault Curator
 
-把已有内容整理成可检索、可关联、可持续维护的 Obsidian 知识库。不要把它当成单纯 Markdown 美化器：先恢��项目上下文和用户方法，再整理当前内容。
+把已有内容整理成可检索、可关联、可持续维护的 Obsidian 知识库。不要把它当成单纯 Markdown 美化器：先恢复项目上下文和用户方法，再整理当前内容。
 
 按需读取：
 - `references/private-state.md`：私有持久化状态、绑定、权限和隐私。
@@ -149,12 +149,13 @@ NB.<AREA>/
 2. 在内存中形成本批次完整最终内容。
 3. 执行语义保护、链接和路径检查。
 4. 尽量把本批次变更合成一个原子 commit。
-5. 创建 PR。
-6. 检查 PR mergeability 和验证结果。
-7. 验证通过且可合并时自动 `squash` merge。
-8. 合并成功后删除临时 head branch，并确认分支不存在。
-9. 更新项目 checkpoint，记录完成项、下一步和 merge commit。
-10. 释放写锁。
+5. 对包含非 ASCII 文本的变更，在开 PR 前回读临时分支并校验远端 blob SHA/UTF-8 完整性；若与本地预期 blob 不一致或出现典型乱码，立即停止，不能继续 merge。
+6. 创建 PR。
+7. 检查 PR mergeability 和验证结果。
+8. 验证通过且可合并时自动 `squash` merge。
+9. 合并成功后删除临时 head branch，并确认分支不存在。
+10. 更新项目 checkpoint，记录完成项、下一步和 merge commit。
+11. 释放写锁。
 
 高风险 rename/move/delete/attachment 仍需用户先授权；一旦授权并验证通过，同样完成 PR → squash merge → branch cleanup，不故意遗留已合并分支。
 
