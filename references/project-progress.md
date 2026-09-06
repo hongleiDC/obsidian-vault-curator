@@ -30,7 +30,7 @@ A project state may contain:
 - important `decisions` that affect future curation;
 - a private `working_set` of relevant note paths/folders when useful;
 - the latest successful PR number / merge commit / temporary branch for recovery;
-- compact intent state: `status`, normalized `summary`, unresolved `pending_questions`, and `confirmed_at`;
+- compact intent state: `status`, corrected normalized `summary`, three unresolved `pending_questions` entries, each containing the question plus its proposed answer, and `confirmed_at`;
 - one active `modification_checklist` for the current task scope.
 
 Do not copy entire note bodies, long conversation summaries, credentials, or irrelevant personal profile data into project state.
@@ -76,9 +76,9 @@ For every GitHub-backed task:
 2. Load the project index.
 3. Resolve the project using this priority: explicit project named by the user → matching project alias → active project → infer from requested top-level project folder when unambiguous.
 4. Read that project's state before editing any note.
-5. If `intent.status` is `needs_clarification`, resume those unresolved questions before doing new mutations.
+5. If `intent.status` is `needs_clarification`, resume the same three unresolved combined question/proposed-answer entries before doing new mutations.
 6. Combine project state with the accepted note methodology and the current remote files.
-7. Run the clarification gate before execution; persist only the normalized unresolved intent, not the chat transcript.
+7. Run the clarification gate before execution: any long/complex request or material uncertainty requires exactly three questions with proposed answers. After the user replies, perform the correction review before deciding whether another round is needed. Persist only the normalized unresolved intent, not the chat transcript.
 8. After intent becomes `ready`, compare the current request scope with `modification_checklist.scope`.
 9. If an unfinished checklist matches the scope, resume it. Otherwise perform a read-only diagnosis limited to the confirmed scope and create a checklist before the first mutation.
 10. Show the concise checklist to the user, then process eligible items by priority/dependency order.
@@ -115,7 +115,7 @@ After a PR is successfully merged and branch cleanup succeeds:
 6. Clear the temporary branch field after branch cleanup succeeds.
 7. Persist the checkpoint atomically.
 
-Do not mark work completed before the PR is merged. If validation or merge fails, keep the old completed state and record the blocker/next action instead. If execution has not started because clarification is incomplete, keep the task out of `completed` and persist the pending questions.
+Do not mark work completed before the PR is merged. If validation or merge fails, keep the old completed state and record the blocker/next action instead. If execution has not started because clarification is incomplete, keep the task out of `completed` and persist the three pending question/proposed-answer entries.
 
 ## Commands
 
@@ -126,8 +126,11 @@ python scripts/project_state.py use --id example-project
 python scripts/project_state.py status
 python scripts/project_state.py read
 python scripts/project_state.py update --focus "Current task" --next-action "Next task"
-python scripts/project_state.py update --intent-status needs_clarification --intent-summary "Current interpretation" --pending-question "Unresolved point"
-python scripts/project_state.py update --confirm-intent
+python scripts/project_state.py update --intent-status needs_clarification --intent-summary "Current interpretation" \
+  --pending-question "Q1: Question 1 | Proposed: Proposed answer 1" \
+  --pending-question "Q2: Question 2 | Proposed: Proposed answer 2" \
+  --pending-question "Q3: Question 3 | Proposed: Proposed answer 3"
+python scripts/project_state.py update --intent-summary "Corrected execution understanding" --confirm-intent
 
 python scripts/project_state.py checklist-start --scope "Example project only" \
   --item "Repair broken internal links" \
